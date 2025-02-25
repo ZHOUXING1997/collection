@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func TestNewCollection(t *testing.T) {
@@ -21,6 +19,7 @@ func TestNewEmptyCollection(t *testing.T) {
 	c := NewEmptyCollection[int32]()
 	if c == nil {
 		t.Error("NewEmptyCollection returned nil")
+		return
 	}
 	if len(c.value) != 0 {
 		t.Error("NewEmptyCollection did not return an empty collection")
@@ -30,13 +29,10 @@ func TestNewEmptyCollection(t *testing.T) {
 func TestCopy(t *testing.T) {
 	// Test that Copy returns a new Collection with the same values and error as the original
 	arr := []int32{1, 2, 3}
-	c := NewCollection[int32](arr).SetErr(errors.New("test error"))
+	c := NewCollection[int32](arr)
 	copied := c.Copy()
 	if !reflect.DeepEqual(copied.value, c.value) {
 		t.Error("Copy did not copy the values correctly")
-	}
-	if copied.err.Error() != c.err.Error() {
-		t.Error("Copy did not copy the error correctly")
 	}
 }
 
@@ -137,7 +133,10 @@ func TestCollectionSearch(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3})
 
 	// search for an existing element
-	index := coll.Search(2)
+	index, err := coll.Search(2)
+	if err != nil {
+		t.Errorf("Search returned an error: %s", err)
+	}
 
 	// check if the index of the element was returned correctly
 	if index != 1 {
@@ -145,7 +144,10 @@ func TestCollectionSearch(t *testing.T) {
 	}
 
 	// search for a non-existing element
-	index = coll.Search(4)
+	index, err = coll.Search(4)
+	if err == nil {
+		t.Errorf("Search returned an error: %s", err)
+	}
 
 	// check if -1 was returned
 	if index != -1 {
@@ -157,7 +159,10 @@ func TestUnique(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 2, 3, 3, 3})
 
 	// get the unique elements
-	uniqueColl := coll.Unique()
+	uniqueColl, err := coll.Unique()
+	if err != nil {
+		t.Errorf("Unique returned an error: %s", err)
+	}
 
 	// check if the length of the unique collection is correct
 	if len(uniqueColl.value) != 3 {
@@ -272,7 +277,10 @@ func TestSlice(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get a slice of the collection
-	slice := coll.Slice(1, 3)
+	slice, err := coll.Slice(1, 3)
+	if err != nil {
+		t.Errorf("Slice returned an error: %s", err)
+	}
 
 	// check if the length of the slice is correct
 	if len(slice.value) != 2 {
@@ -433,7 +441,10 @@ func TestForPage(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the first page with 2 elements per page
-	pageColl := coll.ForPage(1, 2)
+	pageColl, err := coll.ForPage(1, 2)
+	if err != nil {
+		t.Errorf("ForPage returned an error: %s", err)
+	}
 
 	// check if the length of the page collection is correct
 	if len(pageColl.value) != 2 {
@@ -446,7 +457,10 @@ func TestForPage(t *testing.T) {
 	}
 
 	// get the second page with 2 elements per page
-	pageColl = coll.ForPage(2, 2)
+	pageColl, err = coll.ForPage(2, 2)
+	if err != nil {
+		t.Errorf("ForPage returned an error: %s", err)
+	}
 
 	// check if the length of the page collection is correct
 	if len(pageColl.value) != 2 {
@@ -459,7 +473,10 @@ func TestForPage(t *testing.T) {
 	}
 
 	// get the third page with 2 elements per page
-	pageColl = coll.ForPage(3, 2)
+	pageColl, err = coll.ForPage(3, 2)
+	if err != nil {
+		t.Errorf("ForPage returned an error: %s", err)
+	}
 
 	// check if the length of the page collection is correct
 	if len(pageColl.value) != 1 {
@@ -478,7 +495,10 @@ func TestNth(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get every second element starting from the first
-	nthColl := coll.Nth(2, 0)
+	nthColl, err := coll.Nth(2, 0)
+	if err != nil {
+		t.Errorf("Nth returned an error: %s", err)
+	}
 
 	// check if the length of the nth collection is correct
 	if len(nthColl.value) != 3 {
@@ -491,7 +511,10 @@ func TestNth(t *testing.T) {
 	}
 
 	// get every second element starting from the second
-	nthColl = coll.Nth(2, 1)
+	nthColl, err = coll.Nth(2, 1)
+	if err != nil {
+		t.Errorf("Nth returned an error: %s", err)
+	}
 
 	// check if the length of the nth collection is correct
 	if len(nthColl.value) != 2 {
@@ -642,9 +665,16 @@ func TestShuffle(t *testing.T) {
 		t.Errorf("Shuffle did not return the correct number of elements")
 	}
 
-	// check if the shuffled collection contains the same elements as the original collection
-	if !coll.Contains(shuffledColl.value[0]) || !coll.Contains(shuffledColl.value[1]) || !coll.Contains(shuffledColl.value[2]) {
-		t.Errorf("Shuffle did not return the correct elements")
+	if ok, err := coll.Contains(shuffledColl.value[0]); !ok || err != nil {
+		t.Errorf("Shuffle did not return the correct elements, %v", err)
+	}
+
+	if ok, err := coll.Contains(shuffledColl.value[1]); !ok || err != nil {
+		t.Errorf("Shuffle did not return the correct elements, %v", err)
+	}
+
+	if ok, err := coll.Contains(shuffledColl.value[2]); !ok || err != nil {
+		t.Errorf("Shuffle did not return the correct elements, %v", err)
 	}
 }
 
@@ -721,9 +751,9 @@ func TestPluckString(t *testing.T) {
 	})
 
 	// pluck the "name" field from the collection
-	pluckedColl := coll.PluckString("Name")
+	pluckedColl, err := coll.PluckString("Name")
 
-	if pluckedColl.Err() != nil {
+	if err != nil {
 		t.Errorf("PluckString return err")
 	}
 
@@ -747,9 +777,9 @@ func TestPluckStringPointer(t *testing.T) {
 	coll := NewCollection([]*Person{&person1, &person2, &person3})
 
 	// pluck the "name" field from the collection
-	pluckedColl := coll.PluckString("Name")
+	pluckedColl, err := coll.PluckString("Name")
 
-	if pluckedColl.Err() != nil {
+	if err != nil {
 		t.Errorf("PluckString return err")
 	}
 
@@ -778,7 +808,10 @@ func TestPluckInt64(t *testing.T) {
 	})
 
 	// pluck the "id" field from the collection
-	pluckedColl := coll.PluckInt64("Id")
+	pluckedColl, err := coll.PluckInt64("Id")
+	if err != nil {
+		t.Errorf("PluckInt64 return err, %v", err)
+	}
 
 	// check if the length of the plucked collection is correct
 	if pluckedColl.Count() != 3 {
@@ -805,7 +838,10 @@ func TestPluckFloat64(t *testing.T) {
 	})
 
 	// pluck the "price" field from the collection
-	pluckedColl := coll.PluckFloat64("Price")
+	pluckedColl, err := coll.PluckFloat64("Price")
+	if err != nil {
+		t.Errorf("PluckFloat64 return err, %v", err)
+	}
 
 	// check if the length of the plucked collection is correct
 	if pluckedColl.Count() != 3 {
@@ -832,7 +868,10 @@ func TestPluckUint64(t *testing.T) {
 	})
 
 	// pluck the "id" field from the collection
-	pluckedColl := coll.PluckUint64("Id")
+	pluckedColl, err := coll.PluckUint64("Id")
+	if err != nil {
+		t.Errorf("PluckUint64 return err, %v", err)
+	}
 
 	// check if the length of the plucked collection is correct
 	if pluckedColl.Count() != 3 {
@@ -859,7 +898,10 @@ func TestPluckBool(t *testing.T) {
 	})
 
 	// pluck the "is_active" field from the collection
-	pluckedColl := coll.PluckBool("IsActive")
+	pluckedColl, err := coll.PluckBool("IsActive")
+	if err != nil {
+		t.Errorf("PluckBool return err, %v", err)
+	}
 
 	// check if the length of the plucked collection is correct
 	if pluckedColl.Count() != 3 {
@@ -886,7 +928,10 @@ func TestSortBy(t *testing.T) {
 	})
 
 	// sort the collection by the "id" field
-	sortedColl := coll.SortBy("Id")
+	sortedColl, err := coll.SortBy("Id")
+	if err != nil {
+		t.Errorf("SortBy returned an error, %v", err)
+	}
 
 	// check if the length of the sorted collection is correct
 	if len(sortedColl.value) != 3 {
@@ -913,7 +958,10 @@ func TestSortByDesc(t *testing.T) {
 	})
 
 	// sort the collection by the "id" field in descending order
-	sortedColl := coll.SortByDesc("Id")
+	sortedColl, err := coll.SortByDesc("Id")
+	if err != nil {
+		t.Errorf("SortByDesc returned an error, %v", err)
+	}
 
 	// check if the length of the sorted collection is correct
 	if sortedColl.Count() != 3 {
@@ -944,7 +992,7 @@ func TestKeyByStrField(t *testing.T) {
 
 	// check if the error is nil
 	if err != nil {
-		t.Errorf("KeyByStrField returned an error")
+		t.Errorf("KeyByStrField returned an error, %v", err)
 	}
 
 	// check if the length of the keyed collection is correct
@@ -968,7 +1016,10 @@ func TestMax(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the maximum element from the collection
-	max := coll.Max()
+	max, err := coll.Max()
+	if err != nil {
+		t.Errorf("Max returned an error, %v", err)
+	}
 
 	// check if the maximum element is correct
 	if max != 5 {
@@ -982,7 +1033,10 @@ func TestMin(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the minimum element from the collection
-	min := coll.Min()
+	min, err := coll.Min()
+	if err != nil {
+		t.Errorf("Min returned an error, %v", err)
+	}
 
 	// check if the minimum element is correct
 	if min != 1 {
@@ -996,13 +1050,13 @@ func TestContains(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// check if the collection contains the element 3
-	if !coll.Contains(3) {
-		t.Errorf("Contains did not return the correct result")
+	if ok, err := coll.Contains(3); !ok || err != nil {
+		t.Errorf("Contains did not return the correct result, err: %v", err)
 	}
 
 	// check if the collection contains the element 6
-	if coll.Contains(6) {
-		t.Errorf("Contains did not return the correct result")
+	if ok, err := coll.Contains(6); ok && err == nil {
+		t.Errorf("Contains did not return the correct result, err: %v", err)
 	}
 }
 
@@ -1012,7 +1066,7 @@ func TestContainsCount(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5, 3})
 
 	// check the count of the element 3 in the collection
-	count := coll.ContainsCount(3)
+	count, _ := coll.ContainsCount(3)
 
 	// check if the count is correct
 	if count != 2 {
@@ -1027,7 +1081,7 @@ func TestDiff(t *testing.T) {
 	coll2 := NewCollection([]int{3, 4, 5, 6, 7})
 
 	// get the difference between the two collections
-	diffColl := coll1.Diff(coll2)
+	diffColl, _ := coll1.Diff(coll2)
 
 	// check if the length of the difference collection is correct
 	if len(diffColl.value) != 2 {
@@ -1046,7 +1100,7 @@ func TestSort(t *testing.T) {
 	coll := NewCollection([]int{3, 1, 4, 2, 5})
 
 	// sort the collection
-	sortedColl := coll.Sort()
+	sortedColl, _ := coll.Sort()
 
 	// check if the length of the sorted collection is correct
 	if sortedColl.Count() != 5 {
@@ -1110,7 +1164,7 @@ func TestUnion(t *testing.T) {
 	coll2 := NewCollection([]int{3, 4, 5})
 
 	// get the union of the two collections
-	unionColl := coll1.Union(coll2)
+	unionColl, _ := coll1.Union(coll2)
 
 	// check if the length of the union collection is correct
 	if unionColl.Count() != 5 {
@@ -1131,7 +1185,7 @@ func TestIntersect(t *testing.T) {
 	coll2 := NewCollection([]int{3, 4, 5})
 
 	// get the intersection of the two collections
-	intersectColl := coll1.Intersect(coll2)
+	intersectColl, _ := coll1.Intersect(coll2)
 
 	// check if the length of the intersection collection is correct
 	if len(intersectColl.value) != 1 {
@@ -1150,7 +1204,10 @@ func TestAvg(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the average of the elements in the collection
-	avg := coll.Avg()
+	avg, err := coll.Avg()
+	if err != nil {
+		t.Errorf("Avg returned an error: %v", err)
+	}
 
 	// check if the average is correct
 	if avg != 3 {
@@ -1164,7 +1221,10 @@ func TestMedian(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the median of the elements in the collection
-	median := coll.Median()
+	median, err := coll.Median()
+	if err != nil {
+		t.Errorf("Median returned an error: %v", err)
+	}
 
 	// check if the median is correct
 	if median != 3 {
@@ -1175,7 +1235,10 @@ func TestMedian(t *testing.T) {
 	coll2 := NewCollection([]int{1, 2, 3, 4, 5, 6})
 
 	// get the median of the elements in the collection
-	median2 := coll2.Median()
+	median2, err := coll2.Median()
+	if err != nil {
+		t.Errorf("Median returned an error: %v", err)
+	}
 
 	// check if the median is correct
 	if median2 != 3.5 {
@@ -1189,7 +1252,10 @@ func TestMode(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5})
 
 	// get the mode of the elements in the collection
-	mode := coll.Mode()
+	mode, err := coll.Mode()
+	if err != nil {
+		t.Errorf("Mode returned an error: %v", err)
+	}
 
 	// check if the mode is correct
 	if mode != 4 {
@@ -1203,7 +1269,10 @@ func TestSum(t *testing.T) {
 	coll := NewCollection([]int{1, 2, 3, 4, 5})
 
 	// get the sum of the elements in the collection
-	sum := coll.Sum()
+	sum, err := coll.Sum()
+	if err != nil {
+		t.Errorf("Sum returned an error: %v", err)
+	}
 
 	// check if the sum is correct
 	if sum != 15 {

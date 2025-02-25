@@ -11,6 +11,14 @@ import (
 	"time"
 )
 
+// NoComputableError 不可计算
+var NoComputableError = errors.New("collection is not computable")
+var ElementNoComputableError = errors.New("element can not be computable")
+
+// KeyUnComparableError 不可比较
+var KeyUnComparableError = errors.New("key has unComparable type")
+var NoComparableError = errors.New("collection is not comparable")
+
 // 是结构体或者指针
 func (c *Collection[T]) isStructOrPointer() bool {
 	switch c.typ.Kind() {
@@ -20,7 +28,10 @@ func (c *Collection[T]) isStructOrPointer() bool {
 		if c.typ.Elem().Kind() == reflect.Struct {
 			return true
 		}
+	default:
+		return false
 	}
+
 	return false
 }
 
@@ -40,11 +51,12 @@ func (c *Collection[T]) isAddable() bool {
 		reflect.Float32,
 		reflect.Float64:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
-func (c *Collection[T]) isFloatable() bool {
+func (c *Collection[T]) isComputable() bool {
 	switch c.typ.Kind() {
 	case reflect.Int,
 		reflect.Int8,
@@ -54,15 +66,16 @@ func (c *Collection[T]) isFloatable() bool {
 		reflect.Float32,
 		reflect.Float64:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // Collection 主体
 type Collection[T any] struct {
 	value []T // 数组
 
-	err error        // 错误信息
+	// err error        // 错误信息
 	typ reflect.Type // collection 中每个元素的类型，在new的时候就定义了
 
 	cfun func(any, any) int // 比较函数，在new的时候定义了，也可以通过
@@ -225,16 +238,16 @@ func NewEmptyCollection[T any]() *Collection[T] {
 	return NewCollection[T](nil)
 }
 
-// Err 返回Collection的错误信息
-func (c *Collection[T]) Err() error {
-	return c.err
-}
-
-// SetErr 设置Collection的错误信息
-func (c *Collection[T]) SetErr(err error) *Collection[T] {
-	c.err = err
-	return c
-}
+// // Err 返回Collection的错误信息
+// func (c *Collection[T]) Err() error {
+// 	return c.err
+// }
+//
+// // SetErr 设置Collection的错误信息
+// func (c *Collection[T]) SetErr(err error) *Collection[T] {
+// 	c.err = err
+// 	return c
+// }
 
 // SetCompare 设置比较函数
 func (c *Collection[T]) SetCompare(cfun func(a any, b any) int) *Collection[T] {
@@ -244,7 +257,8 @@ func (c *Collection[T]) SetCompare(cfun func(a any, b any) int) *Collection[T] {
 
 // Copy 复制一个新的Collection
 func (c *Collection[T]) Copy() *Collection[T] {
-	coll := NewCollection[T](c.value).SetErr(c.err)
+	// coll := NewCollection[T](c.value).SetErr(c.err)
+	coll := NewCollection[T](c.value)
 	return coll
 }
 
@@ -260,30 +274,18 @@ func (c *Collection[T]) IsNotEmpty() bool {
 
 // Append 添加元素
 func (c *Collection[T]) Append(item T) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
-
 	c.value = append(c.value, item)
 	return c
 }
 
 // Remove 删除元素
 func (c *Collection[T]) Remove(index int) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
-
 	c.value = append(c.value[:index], c.value[index+1:]...)
 	return c
 }
 
 // Insert 插入元素
 func (c *Collection[T]) Insert(index int, item T) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
-
 	arr := make([]T, 0, len(c.value)+1)
 	arr = append(arr, c.value[:index]...)
 	arr = append(arr, item)
@@ -292,28 +294,34 @@ func (c *Collection[T]) Insert(index int, item T) *Collection[T] {
 }
 
 // Search 查找元素
-func (c *Collection[T]) Search(item T) int {
+func (c *Collection[T]) Search(item T) (int, error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("element can not be comparable"))
-		return 0
+		// c.SetErr(errors.New("element can not be comparable"))
+		// return 0
+		return -1, ElementNoComputableError
 	}
 
 	for i, v := range c.value {
 		if c.cfun(v, item) == 0 {
-			return i
+			return i, nil
 		}
 	}
-	return -1
+
+	return -1, fmt.Errorf("not found")
 }
 
 // Unique 去重
-func (c *Collection[T]) Unique() *Collection[T] {
-	if c.err != nil {
-		return c
-	}
+func (c *Collection[T]) Unique() (*Collection[T], error) {
+	// if c.err != nil {
+	// 	return c
+	// }
+	// if !c.isComparable() {
+	// 	c.SetErr(errors.New("element can not be comparable"))
+	// 	return c
+	// }
+
 	if !c.isComparable() {
-		c.SetErr(errors.New("element can not be comparable"))
-		return c
+		return c, ElementNoComputableError
 	}
 
 	// 过滤数组中重复的元素，仅对基础Collection生效
@@ -331,18 +339,15 @@ func (c *Collection[T]) Unique() *Collection[T] {
 			res = append(res, c.value[i])
 		}
 	}
-	return NewCollection[T](res)
+
+	return NewCollection[T](res), nil
 }
 
 // Filter 过滤
 func (c *Collection[T]) Filter(f func(item T, key int) bool) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
-	if !c.isComparable() {
-		c.SetErr(errors.New("element can not be comparable"))
-		return c
-	}
+	// if c.err != nil {
+	// 	return c
+	// }
 
 	// 按照某个方法进行过滤, 保留符合的
 	res := make([]T, 0, len(c.value))
@@ -351,14 +356,15 @@ func (c *Collection[T]) Filter(f func(item T, key int) bool) *Collection[T] {
 			res = append(res, v)
 		}
 	}
+
 	return NewCollection[T](res)
 }
 
 // Reject 过滤
 func (c *Collection[T]) Reject(f func(item T, key int) bool) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
+	// if c.err != nil {
+	// 	return c
+	// }
 
 	res := make([]T, 0, len(c.value))
 	for i, v := range c.value {
@@ -366,13 +372,14 @@ func (c *Collection[T]) Reject(f func(item T, key int) bool) *Collection[T] {
 			res = append(res, v)
 		}
 	}
+
 	return NewCollection[T](res)
 }
 
 // First 获取第一个元素
 func (c *Collection[T]) First() T {
 	var zero T
-	if len(c.value) == 0 {
+	if c.IsEmpty() {
 		return zero
 	}
 
@@ -382,7 +389,7 @@ func (c *Collection[T]) First() T {
 // Last 获取最后一个元素
 func (c *Collection[T]) Last() T {
 	var zero T
-	if len(c.value) == 0 {
+	if c.IsEmpty() {
 		return zero
 	}
 
@@ -390,25 +397,31 @@ func (c *Collection[T]) Last() T {
 }
 
 // Slice 获取数组片段
-func (c *Collection[T]) Slice(params ...int) *Collection[T] {
+func (c *Collection[T]) Slice(params ...int) (*Collection[T], error) {
 	if len(params) == 0 {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("invalid params"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("invalid params"))
+		return NewCollection[T](nil), fmt.Errorf("invalid params")
 	}
 	start := params[0]
 	if start < 0 || start >= len(c.value) {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("invalid start index"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("invalid start index"))
+		return NewCollection[T](nil), fmt.Errorf("invalid start index")
 	}
 	if len(params) == 1 {
-		return NewCollection(c.value[start:]).SetErr(nil)
+		// return NewCollection(c.value[start:]).SetErr(nil)
+		return NewCollection(c.value[start:]), nil
 	}
 	end := params[1]
 	if end < 0 || end > len(c.value) {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("invalid end index"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("invalid end index"))
+		return NewCollection[T](nil), fmt.Errorf("invalid end index")
 	}
 	if start > end {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("start index should be less than end index"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("start index should be less than end index"))
+		return NewCollection[T](nil), fmt.Errorf("start index should be less than end index")
 	}
-	return NewCollection(c.value[start:end]).SetErr(nil)
+
+	return NewCollection(c.value[start:end]), nil
 }
 
 // Index 获取某个下标
@@ -419,14 +432,15 @@ func (c *Collection[T]) Index(i int) T {
 	if i < 0 || i >= len(c.value) {
 		return zero
 	}
+
 	return c.value[i]
 }
 
 // SetIndex 设置某个下标
 func (c *Collection[T]) SetIndex(i int, val T) *Collection[T] {
-	if c.err != nil {
-		return c
-	}
+	// if c.err != nil {
+	// 	return c
+	// }
 
 	// 设置数组的下标为某个值
 	if i < 0 || i >= len(c.value) {
@@ -449,18 +463,19 @@ func (c *Collection[T]) Merge(arr *Collection[T]) *Collection[T] {
 		return c
 	}
 
-	if c.err != nil {
-		return c
-	}
-
-	if arr.err != nil {
-		return c.SetErr(arr.err)
-	}
+	// if c.err != nil {
+	// 	return c
+	// }
+	//
+	// if arr.err != nil {
+	// 	return c.SetErr(arr.err)
+	// }
 
 	res := c.Copy()
 	for i := 0; i < arr.Count(); i++ {
 		res.value = append(res.value, arr.Index(i))
 	}
+
 	return res
 }
 
@@ -477,19 +492,21 @@ func (c *Collection[T]) Map(f func(item T, key int) T) *Collection[T] {
 	for i, v := range c.value {
 		res = append(res, f(v, i))
 	}
+
 	return NewCollection[T](res)
 }
 
 // Reduce 求和
 func (c *Collection[T]) Reduce(f func(carry T, item T) T) T {
 	var zero T
-	if len(c.value) == 0 {
+	if c.IsEmpty() {
 		return zero
 	}
 	res := c.value[0]
 	for i := 1; i < len(c.value); i++ {
 		res = f(res, c.value[i])
 	}
+
 	return res
 }
 
@@ -500,35 +517,41 @@ func (c *Collection[T]) Every(f func(item T, key int) bool) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
 // ForPage 分页
-func (c *Collection[T]) ForPage(page int, perPage int) *Collection[T] {
+func (c *Collection[T]) ForPage(page int, perPage int) (*Collection[T], error) {
 	if page <= 0 || perPage <= 0 {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("invalid page or perPage"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("invalid page or perPage"))
+		return NewCollection[T](nil), fmt.Errorf("invalid page or perPage")
 	}
 	start := (page - 1) * perPage
 	end := start + perPage
 	if start >= len(c.value) {
-		return NewCollection[T](nil)
+		return NewCollection[T](nil), nil
 	}
 	if end > len(c.value) {
 		end = len(c.value)
 	}
-	return &Collection[T]{value: c.value[start:end]}
+
+	return &Collection[T]{value: c.value[start:end]}, nil
 }
 
 // Nth 每隔n个取一个
-func (c *Collection[T]) Nth(n int, offset int) *Collection[T] {
+func (c *Collection[T]) Nth(n int, offset int) (*Collection[T], error) {
 	if n <= 0 {
-		return NewCollection[T](nil).SetErr(fmt.Errorf("invalid n"))
+		// return NewCollection[T](nil).SetErr(fmt.Errorf("invalid n"))
+
+		return NewCollection[T](nil), fmt.Errorf("invalid n")
 	}
 	res := make([]T, 0, len(c.value)/n+1)
 	for i := offset; i < len(c.value); i += n {
 		res = append(res, c.value[i])
 	}
-	return NewCollection[T](res)
+
+	return NewCollection[T](res), nil
 }
 
 // Pad 填充
@@ -543,13 +566,14 @@ func (c *Collection[T]) Pad(count int, def T) *Collection[T] {
 	for i := len(c.value); i < count; i++ {
 		res[i] = def
 	}
+
 	return NewCollection[T](res)
 }
 
 // Pop 弹出最后一个元素
 func (c *Collection[T]) Pop() T {
 	var zero T
-	if len(c.value) == 0 {
+	if c.IsEmpty() {
 		return zero
 	}
 	res := c.value[len(c.value)-1]
@@ -574,11 +598,11 @@ func (c *Collection[T]) Prepend(item T) *Collection[T] {
 // Random 随机取一个元素
 func (c *Collection[T]) Random() T {
 	var zero T
-	if len(c.value) == 0 {
+	if c.IsEmpty() {
 		return zero
 	}
-	rand.Seed(time.Now().UnixNano())
-	return c.value[rand.Intn(len(c.value))]
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return c.value[random.Intn(len(c.value))]
 }
 
 // Reverse 反转
@@ -587,6 +611,7 @@ func (c *Collection[T]) Reverse() *Collection[T] {
 	for i := len(c.value) - 1; i >= 0; i-- {
 		res = append(res, c.value[i])
 	}
+
 	return NewCollection(res)
 }
 
@@ -597,6 +622,7 @@ func (c *Collection[T]) Shuffle() *Collection[T] {
 	for i, v := range perm {
 		res[v] = c.value[i]
 	}
+
 	return NewCollection(res)
 }
 
@@ -610,6 +636,7 @@ func (c *Collection[T]) GroupBy(f func(T, int) interface{}) map[interface{}]*Col
 		}
 		res[key].Push(v)
 	}
+
 	return res
 }
 
@@ -626,6 +653,7 @@ func (c *Collection[T]) Split(size int) []*Collection[T] {
 		}
 		res = append(res, NewCollection(c.value[i:end]))
 	}
+
 	return res
 }
 
@@ -640,11 +668,12 @@ func (c *Collection[T]) DD() {
 }
 
 // PluckString 按照某个字段进行筛选
-func (c *Collection[T]) PluckString(key string) *Collection[string] {
+func (c *Collection[T]) PluckString(key string) (*Collection[string], error) {
 	res := make([]string, 0, len(c.value))
 	if c.typ.Kind() != reflect.Struct && c.typ.Kind() != reflect.Pointer {
-		c.SetErr(errors.New("invalid collection"))
-		return nil
+		// c.SetErr(errors.New("invalid collection"))
+		// return nil
+		return nil, errors.New("invalid collection")
 	}
 
 	for _, v := range c.value {
@@ -656,17 +685,19 @@ func (c *Collection[T]) PluckString(key string) *Collection[string] {
 		}
 		kind := val.Type().Kind()
 		if kind != reflect.String {
-			c.SetErr(errors.New("invalid type"))
-			return nil
+			// c.SetErr(errors.New("invalid type"))
+			// return nil
+			return nil, errors.New("invalid type")
 		}
 
 		res = append(res, val.String())
 	}
-	return NewCollection(res)
+
+	return NewCollection(res), nil
 }
 
 // PluckInt64 按照某个字段进行筛选
-func (c *Collection[T]) PluckInt64(key string) *Collection[int64] {
+func (c *Collection[T]) PluckInt64(key string) (*Collection[int64], error) {
 	res := make([]int64, 0, len(c.value))
 	for _, v := range c.value {
 		var val reflect.Value
@@ -676,17 +707,20 @@ func (c *Collection[T]) PluckInt64(key string) *Collection[int64] {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanInt() {
-			c.SetErr(errors.New("invalid type"))
-			return nil
+			// c.SetErr(errors.New("invalid type"))
+			// return nil
+
+			return nil, errors.New("invalid type")
 		}
 
 		res = append(res, val.Int())
 	}
-	return NewCollection(res)
+
+	return NewCollection(res), nil
 }
 
 // PluckFloat64 按照某个字段进行筛选
-func (c *Collection[T]) PluckFloat64(key string) *Collection[float64] {
+func (c *Collection[T]) PluckFloat64(key string) (*Collection[float64], error) {
 	res := make([]float64, 0, len(c.value))
 	for _, v := range c.value {
 		var val reflect.Value
@@ -696,17 +730,20 @@ func (c *Collection[T]) PluckFloat64(key string) *Collection[float64] {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanFloat() {
-			c.SetErr(errors.New("invalid type"))
-			return nil
+			// c.SetErr(errors.New("invalid type"))
+			// return nil
+
+			return nil, errors.New("invalid type")
 		}
 
 		res = append(res, val.Float())
 	}
-	return NewCollection(res)
+
+	return NewCollection(res), nil
 }
 
 // PluckUint64 按照某个字段进行筛选
-func (c *Collection[T]) PluckUint64(key string) *Collection[uint64] {
+func (c *Collection[T]) PluckUint64(key string) (*Collection[uint64], error) {
 	res := make([]uint64, 0, len(c.value))
 	for _, v := range c.value {
 		var val reflect.Value
@@ -716,17 +753,20 @@ func (c *Collection[T]) PluckUint64(key string) *Collection[uint64] {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanUint() {
-			c.SetErr(errors.New("invalid type"))
-			return nil
+			// c.SetErr(errors.New("invalid type"))
+			// return nil
+
+			return nil, errors.New("invalid type")
 		}
 
 		res = append(res, val.Uint())
 	}
-	return NewCollection(res)
+
+	return NewCollection(res), nil
 }
 
 // PluckBool 按照某个字段进行筛选
-func (c *Collection[T]) PluckBool(key string) *Collection[bool] {
+func (c *Collection[T]) PluckBool(key string) (*Collection[bool], error) {
 	res := make([]bool, 0, len(c.value))
 	for _, v := range c.value {
 		var val reflect.Value
@@ -736,23 +776,30 @@ func (c *Collection[T]) PluckBool(key string) *Collection[bool] {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if val.Kind() != reflect.Bool {
-			c.SetErr(errors.New("invalid type"))
-			return nil
+			// c.SetErr(errors.New("invalid type"))
+			// return nil
+
+			return nil, errors.New("invalid type")
 		}
 
 		res = append(res, val.Bool())
 	}
-	return NewCollection(res)
+
+	return NewCollection(res), nil
 }
 
 // SortBy 按照某个字段进行排序
-func (c *Collection[T]) SortBy(key string) *Collection[T] {
+func (c *Collection[T]) SortBy(key string) (*Collection[T], error) {
+	var err error
 
 	sort.Slice(c.value, func(i, j int) bool {
 		val1 := reflect.ValueOf(c.value[i]).FieldByName(key)
 		val2 := reflect.ValueOf(c.value[j]).FieldByName(key)
 		if val1.Kind() != val2.Kind() {
-			c.SetErr(errors.New("key has uncomparable type"))
+			// c.SetErr(errors.New("key has uncomparable type"))
+
+			err = KeyUnComparableError
+
 			return false
 		}
 
@@ -768,21 +815,28 @@ func (c *Collection[T]) SortBy(key string) *Collection[T] {
 		case reflect.Bool:
 			return val1.Bool() == false && val2.Bool() == true
 		default:
-			c.SetErr(errors.New("key has uncomparable type"))
+			// c.SetErr(errors.New("key has uncomparable type"))
+
+			err = KeyUnComparableError
 		}
 
 		return false
 	})
-	return c
+
+	return c, err
 }
 
 // SortByDesc 按照某个字段进行排序,倒序
-func (c *Collection[T]) SortByDesc(key string) *Collection[T] {
+func (c *Collection[T]) SortByDesc(key string) (*Collection[T], error) {
+	var err error
 	sort.Slice(c.value, func(i, j int) bool {
 		val1 := reflect.ValueOf(c.value[i]).FieldByName(key)
 		val2 := reflect.ValueOf(c.value[j]).FieldByName(key)
 		if val1.Kind() != val2.Kind() {
-			c.SetErr(errors.New("key has uncomparable type"))
+			// c.SetErr(errors.New("key has uncomparable type"))
+
+			err = KeyUnComparableError
+
 			return false
 		}
 
@@ -798,12 +852,15 @@ func (c *Collection[T]) SortByDesc(key string) *Collection[T] {
 		case reflect.Bool:
 			return val1.Bool() == true && val2.Bool() == false
 		default:
-			c.SetErr(errors.New("key has uncomparable type"))
+			// c.SetErr(errors.New("key has uncomparable type"))
+
+			err = KeyUnComparableError
 		}
 
 		return false
 	})
-	return c
+
+	return c, err
 }
 
 // KeyByStrField 根据某个字段为key，返回一个map,要求key对应的field是string
@@ -819,76 +876,89 @@ func (c *Collection[T]) KeyByStrField(key string) (map[string]T, error) {
 			}
 		}
 	}
+
 	return res, nil
 }
 
 // Max 数组中最大的元素，仅对基础Collection生效, 可以传递一个比较函数
-func (c *Collection[T]) Max() T {
+func (c *Collection[T]) Max() (T, error) {
 	var zero T
 
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return zero
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return zero
+
+		return zero, NoComparableError
 	}
 
-	if len(c.value) == 0 {
-		return zero
+	if c.IsEmpty() {
+		return zero, nil
 	}
-	max := c.value[0]
+
+	maxElem := c.value[0]
 	for _, v := range c.value {
-		if c.cfun(v, max) > 0 {
-			max = v
+		if c.cfun(v, maxElem) > 0 {
+			maxElem = v
 		}
 	}
-	return max
+
+	return maxElem, nil
 }
 
 // Min 数组中最小的元素，仅对基础Collection生效
-func (c *Collection[T]) Min() T {
+func (c *Collection[T]) Min() (T, error) {
 	var zero T
 
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return zero
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return zero
+
+		return zero, NoComparableError
 	}
 
-	if len(c.value) == 0 {
-		return zero
+	if c.IsEmpty() {
+		return zero, nil
 	}
-	min := c.value[0]
+
+	minElem := c.value[0]
 	for _, v := range c.value {
-		if c.cfun(v, min) < 0 {
-			min = v
+		if c.cfun(v, minElem) < 0 {
+			minElem = v
 		}
 	}
-	return min
+
+	return minElem, nil
 }
 
 // Contains 判断是否包含某个元素，（并不进行定位），对基础Collection生效
-func (c *Collection[T]) Contains(obj T) bool {
-
+func (c *Collection[T]) Contains(obj T) (bool, error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return false
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return false
+
+		return false, NoComparableError
 	}
 
-	if len(c.value) == 0 {
-		return false
+	if c.IsEmpty() {
+		return false, nil
 	}
 
 	for _, v := range c.value {
 		if c.cfun(v, obj) == 0 {
-			return true
+			return true, nil
 		}
 	}
-	return false
+
+	return false, nil
 }
 
 // ContainsCount 判断包含某个元素的个数，返回0代表没有找到，返回正整数代表个数。必须设置compare函数
-func (c *Collection[T]) ContainsCount(obj T) int {
+func (c *Collection[T]) ContainsCount(obj T) (int, error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return 0
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return 0
+
+		return 0, NoComparableError
 	}
 
 	count := 0
@@ -897,35 +967,41 @@ func (c *Collection[T]) ContainsCount(obj T) int {
 			count++
 		}
 	}
-	return count
+
+	return count, nil
 }
 
 // Diff 比较两个数组，获取第一个数组不在第二个数组中的元素，组成新数组
-func (c *Collection[T]) Diff(arr *Collection[T]) *Collection[T] {
-	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return c
+func (c *Collection[T]) Diff(arr *Collection[T]) (*Collection[T], error) {
+	if !c.isComparable() || !arr.isComputable() {
+		// c.SetErr(errors.New("collection is not comparable"))
+		return c, NoComparableError
 	}
 
 	res := NewCollection([]T{})
 	for _, v := range c.value {
-		if !arr.Contains(v) {
+		if ok, err := arr.Contains(v); !ok && err == nil {
 			res.Append(v)
+		} else if err != nil {
+			return nil, err
 		}
 	}
-	return res
+
+	return res, nil
 }
 
-func (c *Collection[T]) Sort() *Collection[T] {
+func (c *Collection[T]) Sort() (*Collection[T], error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return nil
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return nil
+
+		return nil, NoComparableError
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
 		return c.cfun(c.value[i], c.value[j]) < 0
 	})
-	return c
+	return c, nil
 }
 
 // SortDesc 进行排序，倒序
@@ -949,64 +1025,86 @@ func (c *Collection[T]) Join(split string, format ...func(item interface{}) stri
 			res += split
 		}
 	}
+
 	return res
 }
 
 // Union 两个集合的并集
-func (c *Collection[T]) Union(arr *Collection[T]) *Collection[T] {
+func (c *Collection[T]) Union(arr *Collection[T]) (*Collection[T], error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return nil
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return nil
+
+		return nil, NoComparableError
 	}
 
 	res := c.Copy()
 	for _, v := range arr.value {
-		if !c.Contains(v) {
+		if ok, err := c.Contains(v); !ok && err == nil {
 			res.Append(v)
+		} else if err != nil {
+			return nil, err
 		}
 	}
-	return res
+
+	return res, nil
 }
 
 // Intersect 两个集合的交集
-func (c *Collection[T]) Intersect(arr *Collection[T]) *Collection[T] {
+func (c *Collection[T]) Intersect(arr *Collection[T]) (*Collection[T], error) {
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return nil
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return nil
+
+		return nil, NoComparableError
 	}
 
 	res := NewCollection([]T{})
 	for _, v := range c.value {
-		if arr.Contains(v) {
+		if ok, err := arr.Contains(v); ok && err == nil {
 			res.Append(v)
+		} else if err != nil {
+			return nil, err
 		}
 	}
-	return res
+
+	return res, nil
 }
 
 // Avg 获取平均值
-func (c *Collection[T]) Avg() float64 {
-	if !c.isFloatable() {
-		c.SetErr(errors.New("collection is not floatable"))
-		return 0.0
+func (c *Collection[T]) Avg() (float64, error) {
+	if !c.isComputable() {
+		// c.SetErr(errors.New("collection is not floatable"))
+		// return 0.0
+
+		return 0.0, NoComputableError
 	}
 
-	if len(c.value) == 0 {
-		return 0.0
+	if c.IsEmpty() {
+		return 0.0, nil
 	}
-	return c.Sum() / float64(len(c.value))
+	sum, err := c.Sum()
+	if err != nil {
+		return 0.0, err
+	}
+
+	return sum / float64(len(c.value)), nil
 }
 
 // Median 获取中位值。
 // 中位数（Median）又称中值，统计学中的专有名词，是按顺序排列的一组数据中居于中间位置的数，代表一个样本、种群或概率分布中的一个数值，其可将数值集合划分为相等的上下两部分。
 // 对于有限的数集，可以通过把所有观察值高低排序后找出正中间的一个作为中位数。如果观察值有偶数个，通常取最中间的两个数值的平均数作为中位数。
-func (c *Collection[T]) Median() float64 {
-	if !c.isFloatable() {
-		c.SetErr(errors.New("collection is not floatable"))
-		return 0.0
+func (c *Collection[T]) Median() (float64, error) {
+	if !c.isComputable() {
+		// c.SetErr(errors.New("collection is not floatable"))
+
+		return 0.0, NoComputableError
 	}
 
-	coll := c.Sort()
+	coll, err := c.Sort()
+	if err != nil {
+		return 0.0, err
+	}
 	newColl := NewCollection([]T{})
 	if len(coll.value)%2 == 0 {
 		newColl.Append(coll.Index(len(coll.value)/2 - 1)).Append(coll.Index(len(coll.value) / 2))
@@ -1024,15 +1122,15 @@ type tCount struct {
 }
 
 // Mode 获取Mode值，众数，一组数据中出现最多的
-func (c *Collection[T]) Mode() T {
+func (c *Collection[T]) Mode() (T, error) {
 	var zero T
 	if !c.isComparable() {
-		c.SetErr(errors.New("collection is not comparable"))
-		return zero
+		// c.SetErr(errors.New("collection is not comparable"))
+		return zero, NoComparableError
 	}
 
-	if len(c.value) == 0 {
-		return zero
+	if c.IsEmpty() {
+		return zero, nil
 	}
 
 	summary := make([]tCount, 0, c.Count())
@@ -1068,17 +1166,18 @@ func (c *Collection[T]) Mode() T {
 			maxIndex = tcount.cindex
 		}
 	}
-	return c.value[maxIndex]
+
+	return c.value[maxIndex], nil
 }
 
 // Sum 获取sum值
-func (c *Collection[T]) Sum() float64 {
-	if len(c.value) == 0 {
-		return 0.0
+func (c *Collection[T]) Sum() (float64, error) {
+	if c.IsEmpty() {
+		return 0.0, nil
 	}
-	if !c.isFloatable() {
-		c.SetErr(errors.New("collection is not floatable"))
-		return 0.0
+	if !c.isComputable() {
+		// c.SetErr(errors.New("collection is not floatable"))
+		return 0.0, NoComputableError
 	}
 
 	sum := float64(0)
@@ -1091,12 +1190,13 @@ func (c *Collection[T]) Sum() float64 {
 		case reflect.Float32, reflect.Float64:
 			sum += reflect.ValueOf(item).Float()
 		default:
-			// set c.err
-			c.SetErr(errors.New("invalid type"))
+			// c.SetErr(errors.New("invalid type"))
+
+			return 0.0, fmt.Errorf("unsupported type: %T", item)
 		}
 	}
 
-	return sum
+	return sum, nil
 }
 
 // Values 获取值

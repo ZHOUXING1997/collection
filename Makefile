@@ -24,6 +24,14 @@ push_pkg:
 		echo "错误: TAG_NAME为空，请提供有效的标签名称"; \
 		exit 1; \
 	fi
+
+	@echo "执行 go test..."
+	go test -v ./... || exit 1
+
+	@echo "列出包..."
+	go list -m all
+
+	@echo "推送至 https://pkg.go.dev/..."
 	go list -m github.com/ZHOUXING1997/collection@$(TAG_NAME)
 
 .PHONY: help
