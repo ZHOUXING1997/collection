@@ -2,14 +2,13 @@ package collection
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // 是结构体或者指针
