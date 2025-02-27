@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -40,39 +39,14 @@ func (c *Collection[T]) isComparable() bool {
 	return c.compareFunc != nil
 }
 
-// 是可以加法运算的（到float）
-func (c *Collection[T]) isAddable() bool {
-	switch c.typ.Kind() {
-	case reflect.Int,
-		reflect.Int8,
-		reflect.Int16,
-		reflect.Int32,
-		reflect.Int64,
-		reflect.Float32,
-		reflect.Float64:
-		return true
-	default:
-		return false
-	}
-}
-
+// 是可以进行计算的
 func (c *Collection[T]) isComputable() bool {
-	switch c.typ.Kind() {
-	case reflect.Int,
-		reflect.Int8,
-		reflect.Int16,
-		reflect.Int32,
-		reflect.Int64,
-		reflect.Float32,
-		reflect.Float64:
-		return true
-	default:
-		return false
-	}
+	return isComputableKind(c.typ.Kind())
 }
 
-func (c *Collection[T]) newCompare(typ reflect.Type) func(any, any) int {
-	switch typ.Kind() {
+// -1：小于，0：等于，1：大于
+func (c *Collection[T]) newCompare(kind reflect.Kind) func(any, any) int {
+	switch kind {
 	case reflect.Int:
 		return func(a, b any) int {
 			vala := a.(int)
@@ -205,12 +179,12 @@ func (c *Collection[T]) newCompare(typ reflect.Type) func(any, any) int {
 			}
 			return 0
 		}
-	case reflect.String:
-		return func(a, b any) int {
-			vala := a.(string)
-			valb := b.(string)
-			return strings.Compare(vala, valb)
-		}
+	// case reflect.String: // 字符串排序有问题，这里不再自动注册，如果需要使用，请使用 SetCompare 进行注册
+	// 	return func(a, b any) int {
+	// 		vala := a.(string)
+	// 		valb := b.(string)
+	// 		return strings.Compare(vala, valb)
+	// 	}
 	default:
 		return nil
 	}
@@ -232,7 +206,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 	typ := reflect.TypeOf(zero)
 	coll := &Collection[T]{value: values, typ: typ}
 
-	coll.compareFunc = coll.newCompare(typ)
+	coll.compareFunc = coll.newCompare(typ.Kind())
 
 	return coll
 }
@@ -819,77 +793,101 @@ func (c *Collection[T]) PluckBool(key string) (*Collection[bool], error) {
 
 // SortBy 按照某个字段进行排序
 func (c *Collection[T]) SortBy(key string) (*Collection[T], error) {
-	var err error
+	if c.IsEmpty() || !c.isStructOrPointer() {
+		return c, errors.New("collection `T` must be a struct or pointer to struct")
+	}
+
+	// 预先检查字段类型
+	baseType := reflect.TypeOf(c.value[0])
+	isPointer := baseType.Kind() == reflect.Pointer
+
+	// 获取实际的结构体类型
+	if isPointer {
+		baseType = baseType.Elem()
+	}
+
+	// 检查字段是否存在和类型是否可比较
+	field, exists := baseType.FieldByName(key)
+	if !exists {
+		return c, fmt.Errorf("field %s does not exist", key)
+	}
+
+	// 使用闭包避免重复反射操作
+	lessFunc := c.newCompare(field.Type.Kind())
+	if lessFunc == nil {
+		return c, KeyUnComparableError
+	}
 
 	sort.Slice(c.value, func(i, j int) bool {
-		val1 := reflect.ValueOf(c.value[i]).FieldByName(key)
-		val2 := reflect.ValueOf(c.value[j]).FieldByName(key)
-		if val1.Kind() != val2.Kind() {
-			// c.SetErr(errors.New("key has uncomparable type"))
-
-			err = KeyUnComparableError
-
-			return false
+		var val1, val2 reflect.Value
+		// 处理指针类型
+		if isPointer {
+			val1 = reflect.ValueOf(c.value[i]).Elem().FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).Elem().FieldByName(key)
+		} else {
+			val1 = reflect.ValueOf(c.value[i]).FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).FieldByName(key)
 		}
+		r := lessFunc(val1.Interface(), val2.Interface())
 
-		switch val1.Kind() {
-		case reflect.String:
-			return val1.String() < val2.String()
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return val1.Int() < val2.Int()
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return val1.Uint() < val2.Uint()
-		case reflect.Float32, reflect.Float64:
-			return val1.Float() < val2.Float()
-		case reflect.Bool:
-			return val1.Bool() == false && val2.Bool() == true
-		default:
-			// c.SetErr(errors.New("key has uncomparable type"))
-
-			err = KeyUnComparableError
-		}
-
-		return false
+		return r < 0
 	})
 
-	return c, err
+	return c, nil
+}
+
+// SortBy 按照某个字段进行排序
+func (c *Collection[T]) SortByFunc(fn func(v1, v2 T) bool) (*Collection[T], error) {
+	sort.Slice(c.value, func(i, j int) bool {
+		return fn(c.value[i], c.value[j])
+	})
+
+	return c, nil
 }
 
 // SortByDesc 按照某个字段进行排序,倒序
 func (c *Collection[T]) SortByDesc(key string) (*Collection[T], error) {
-	var err error
+	if c.IsEmpty() || !c.isStructOrPointer() {
+		return c, errors.New("collection `T` must be a struct or pointer to struct")
+	}
+
+	// 预先检查字段类型
+	baseType := reflect.TypeOf(c.value[0])
+	isPointer := baseType.Kind() == reflect.Pointer
+
+	// 获取实际的结构体类型
+	if isPointer {
+		baseType = baseType.Elem()
+	}
+
+	// 检查字段是否存在和类型是否可比较
+	field, exists := baseType.FieldByName(key)
+	if !exists {
+		return c, fmt.Errorf("field %s does not exist", key)
+	}
+
+	// 使用闭包避免重复反射操作
+	lessFunc := c.newCompare(field.Type.Kind())
+	if lessFunc == nil {
+		return c, KeyUnComparableError
+	}
+
 	sort.Slice(c.value, func(i, j int) bool {
-		val1 := reflect.ValueOf(c.value[i]).FieldByName(key)
-		val2 := reflect.ValueOf(c.value[j]).FieldByName(key)
-		if val1.Kind() != val2.Kind() {
-			// c.SetErr(errors.New("key has uncomparable type"))
-
-			err = KeyUnComparableError
-
-			return false
+		var val1, val2 reflect.Value
+		// 处理指针类型
+		if isPointer {
+			val1 = reflect.ValueOf(c.value[i]).Elem().FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).Elem().FieldByName(key)
+		} else {
+			val1 = reflect.ValueOf(c.value[i]).FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).FieldByName(key)
 		}
+		r := lessFunc(val1.Interface(), val2.Interface())
 
-		switch val1.Kind() {
-		case reflect.String:
-			return val1.String() > val2.String()
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return val1.Int() > val2.Int()
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return val1.Uint() > val2.Uint()
-		case reflect.Float32, reflect.Float64:
-			return val1.Float() > val2.Float()
-		case reflect.Bool:
-			return val1.Bool() == true && val2.Bool() == false
-		default:
-			// c.SetErr(errors.New("key has uncomparable type"))
-
-			err = KeyUnComparableError
-		}
-
-		return false
+		return r > 0
 	})
 
-	return c, err
+	return c, nil
 }
 
 // KeyByStrField 根据某个字段为key，返回一个map,要求key对应的field是string
@@ -1002,7 +1000,7 @@ func (c *Collection[T]) ContainsCount(obj T) (int, error) {
 
 // Diff 比较两个数组，获取第一个数组不在第二个数组中的元素，组成新数组
 func (c *Collection[T]) Diff(arr *Collection[T]) (*Collection[T], error) {
-	if !c.isComparable() || !arr.isComputable() {
+	if !c.isComparable() {
 		// c.SetErr(errors.New("collection is not comparable"))
 		return c, NoComparableError
 	}
@@ -1034,11 +1032,19 @@ func (c *Collection[T]) Sort() (*Collection[T], error) {
 }
 
 // SortDesc 进行排序，倒序
-func (c *Collection[T]) SortDesc() *Collection[T] {
+func (c *Collection[T]) SortDesc() (*Collection[T], error) {
+	if !c.isComparable() {
+		// c.SetErr(errors.New("collection is not comparable"))
+		// return nil
+
+		return nil, NoComparableError
+	}
+
 	sort.Slice(c.value, func(i, j int) bool {
 		return c.compareFunc(c.value[i], c.value[j]) > 0
 	})
-	return c
+
+	return c, nil
 }
 
 // Join 进行拼接

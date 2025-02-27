@@ -1,7 +1,9 @@
 package collection
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -361,7 +363,7 @@ func TestEach(t *testing.T) {
 	}
 
 	// apply the function to each element of the collection
-	coll.Each(addOne)
+	coll.Foreach(addOne)
 
 	// check if the elements were modified correctly
 	if coll.value[0] != 2 || coll.value[1] != 3 || coll.value[2] != 4 {
@@ -944,6 +946,83 @@ func TestSortBy(t *testing.T) {
 	}
 }
 
+// TestSortBy tests the SortBy method of the Collection struct
+func TestSortByPtr(t *testing.T) {
+	// create a new Collection with some elements
+	type Person struct {
+		Id  int
+		Age int
+	}
+	coll := NewCollection([]*Person{
+		{3, 20},
+		{1, 30},
+		{2, 40},
+	})
+
+	// sort the collection by the "id" field
+	sortedColl, err := coll.SortBy("Id")
+	if err != nil {
+		t.Errorf("SortBy returned an error, %v", err)
+	}
+
+	// check if the length of the sorted collection is correct
+	if len(sortedColl.value) != 3 {
+		t.Errorf("SortBy did not return the correct number of elements")
+	}
+
+	// check if the sorted collection contains the correct elements
+	if sortedColl.value[0].Id != 1 || sortedColl.value[1].Id != 2 || sortedColl.value[2].Id != 3 {
+		t.Errorf("SortBy did not return the correct elements")
+	}
+}
+
+// TestSortByFunc tests the SortBy method of the Collection struct
+func TestSortByFunc(t *testing.T) {
+	// create a new Collection with some elements
+	type T struct {
+		Deductible string `json:"deductible"`
+		Amount     string `json:"amount"`
+	}
+
+	coll := NewCollection([]T{
+		{"1000", "47222.3192575596"},
+		{"50", "49870.2997764566"},
+		{"100", "47222.3192575596"},
+		{"250", "47222.3192575596"},
+		{"200", "47222.3192575596"},
+	})
+
+	// sort the collection by the "id" field
+	sortedColl, err := coll.SortByFunc(func(v1, v2 T) bool {
+		intV1, err := strconv.ParseFloat(v1.Deductible, 64)
+		if err != nil {
+			t.Errorf("parse float err: %v", err)
+			return false
+		}
+		intV2, err := strconv.ParseFloat(v2.Deductible, 64)
+		if err != nil {
+			t.Errorf("parse float err: %v", err)
+			return false
+		}
+
+		return intV1 < intV2
+	})
+	if err != nil {
+		t.Errorf("SortBy returned an error, %v", err)
+	}
+
+	// check if the length of the sorted collection is correct
+	if len(sortedColl.value) != coll.Count() {
+		t.Errorf("SortBy did not return the correct number of elements")
+	}
+
+	// check if the sorted collection contains the correct elements
+	if sortedColl.value[0].Deductible != "50" || sortedColl.value[1].Deductible != "100" || sortedColl.value[2].Deductible != "200" {
+		t.Errorf("SortBy did not return the correct elements")
+	}
+	fmt.Println(sortedColl.value)
+}
+
 // TestSortByDesc tests the SortByDesc method of the Collection struct
 func TestSortByDesc(t *testing.T) {
 	// create a new Collection with some elements
@@ -952,6 +1031,36 @@ func TestSortByDesc(t *testing.T) {
 		Age int
 	}
 	coll := NewCollection([]Person{
+		{3, 20},
+		{1, 30},
+		{2, 40},
+	})
+
+	// sort the collection by the "id" field in descending order
+	sortedColl, err := coll.SortByDesc("Id")
+	if err != nil {
+		t.Errorf("SortByDesc returned an error, %v", err)
+	}
+
+	// check if the length of the sorted collection is correct
+	if sortedColl.Count() != 3 {
+		t.Errorf("SortByDesc did not return the correct number of elements")
+	}
+
+	// check if the sorted collection contains the correct elements
+	if sortedColl.Index(0).Id != 3 || sortedColl.Index(1).Id != 2 || sortedColl.Index(2).Id != 1 {
+		t.Errorf("SortByDesc did not return the correct elements")
+	}
+}
+
+// TestSortByDesc tests the SortByDesc method of the Collection struct
+func TestSortByDescPtr(t *testing.T) {
+	// create a new Collection with some elements
+	type Person struct {
+		Id  int
+		Age int
+	}
+	coll := NewCollection([]*Person{
 		{3, 20},
 		{1, 30},
 		{2, 40},
@@ -1120,7 +1229,10 @@ func TestSortDesc(t *testing.T) {
 	coll := NewCollection([]int{3, 1, 4, 2, 5})
 
 	// sort the collection in descending order
-	sortedColl := coll.SortDesc()
+	sortedColl, err := coll.SortDesc()
+	if err != nil {
+		t.Errorf("SortDesc returned an error, %v", err)
+	}
 
 	// check if the length of the sorted collection is correct
 	if len(sortedColl.value) != 5 {
