@@ -836,6 +836,67 @@ func (c *Collection[T]) SortBy(key string) (*Collection[T], error) {
 	return c, nil
 }
 
+// SortBy 按照某个字段转换为float进行排序，且字段必须为 string、int、float
+// 如果转换为float失败后，会视为没满足条件
+func (c *Collection[T]) SortFloatBy(key string) (*Collection[T], error) {
+	if c.IsEmpty() || !c.isStructOrPointer() {
+		return c, errors.New("collection `T` must be a struct or pointer to struct")
+	}
+
+	// 预先检查字段类型
+	baseType := reflect.TypeOf(c.value[0])
+	isPointer := baseType.Kind() == reflect.Pointer
+
+	// 获取实际的结构体类型
+	if isPointer {
+		baseType = baseType.Elem()
+	}
+
+	// 检查字段是否存在和类型是否可比较
+	field, exists := baseType.FieldByName(key)
+	if !exists {
+		return c, fmt.Errorf("field %s does not exist", key)
+	}
+
+	if !isComputableKind(field.Type.Kind()) && field.Type.Kind() != reflect.String {
+		return c, fmt.Errorf("field %s is not computable", key)
+	}
+
+	// 使用闭包避免重复反射操作
+	lessFunc := c.newCompare(reflect.Float64)
+	if lessFunc == nil {
+		return c, KeyUnComparableError
+	}
+
+	var err error
+	sort.Slice(c.value, func(i, j int) bool {
+		var val1, val2 reflect.Value
+		// 处理指针类型
+		if isPointer {
+			val1 = reflect.ValueOf(c.value[i]).Elem().FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).Elem().FieldByName(key)
+		} else {
+			val1 = reflect.ValueOf(c.value[i]).FieldByName(key)
+			val2 = reflect.ValueOf(c.value[j]).FieldByName(key)
+		}
+
+		var v1f, v2f float64
+		v1f, err = any2Float(val1.Interface())
+		if err != nil {
+			return false
+		}
+
+		v2f, err = any2Float(val2.Interface())
+		if err != nil {
+			return false
+		}
+
+		return lessFunc(v1f, v2f) < 0
+	})
+
+	return c, nil
+}
+
 // SortBy 按照某个字段进行排序
 func (c *Collection[T]) SortByFunc(fn func(v1, v2 T) bool) (*Collection[T], error) {
 	sort.Slice(c.value, func(i, j int) bool {

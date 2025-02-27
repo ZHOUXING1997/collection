@@ -946,6 +946,40 @@ func TestSortBy(t *testing.T) {
 	}
 }
 
+// TestSortFloatBy tests the SortFloatBy method of the Collection struct
+func TestSortFloatBy(t *testing.T) {
+	// create a new Collection with some elements
+	type T struct {
+		Deductible string `json:"deductible"`
+		Amount     string `json:"amount"`
+	}
+
+	coll := NewCollection([]T{
+		{"1000", "47222.3192575596"},
+		{"50", "49870.2997764566"},
+		{"100", "47222.3192575596"},
+		{"250", "47222.3192575596"},
+		{"200", "47222.3192575596"},
+	})
+
+	// sort the collection by the "id" field
+	sortedColl, err := coll.SortFloatBy("Deductible")
+	if err != nil {
+		t.Errorf("SortBy returned an error, %v", err)
+	}
+
+	// check if the length of the sorted collection is correct
+	if len(sortedColl.value) != coll.Count() {
+		t.Errorf("SortBy did not return the correct number of elements")
+	}
+
+	// check if the sorted collection contains the correct elements
+	if sortedColl.value[0].Deductible != "50" || sortedColl.value[1].Deductible != "100" || sortedColl.value[2].Deductible != "200" {
+		t.Errorf("SortBy did not return the correct elements")
+	}
+	fmt.Println(sortedColl.value)
+}
+
 // TestSortBy tests the SortBy method of the Collection struct
 func TestSortByPtr(t *testing.T) {
 	// create a new Collection with some elements
