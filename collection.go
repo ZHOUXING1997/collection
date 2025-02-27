@@ -37,7 +37,7 @@ func (c *Collection[T]) isStructOrPointer() bool {
 
 // 是可比较的
 func (c *Collection[T]) isComparable() bool {
-	return c.cfun != nil
+	return c.compareFunc != nil
 }
 
 // 是可以加法运算的（到float）
@@ -71,25 +71,10 @@ func (c *Collection[T]) isComputable() bool {
 	}
 }
 
-// Collection 主体
-type Collection[T any] struct {
-	value []T // 数组
-
-	// err error        // 错误信息
-	typ reflect.Type // collection 中每个元素的类型，在new的时候就定义了
-
-	cfun func(any, any) int // 比较函数，在new的时候定义了，也可以通过
-}
-
-// NewCollection 初始化一个compare
-func NewCollection[T any](values []T) *Collection[T] {
-	var zero T
-	typ := reflect.TypeOf(zero)
-	coll := &Collection[T]{value: values, typ: typ}
-
+func (c *Collection[T]) newCompare(typ reflect.Type) func(any, any) int {
 	switch typ.Kind() {
 	case reflect.Int:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(int)
 			valb := b.(int)
 			if vala > valb {
@@ -100,7 +85,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Int8:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(int8)
 			valb := b.(int8)
 			if vala > valb {
@@ -111,7 +96,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Int16:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(int16)
 			valb := b.(int16)
 			if vala > valb {
@@ -122,7 +107,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Int32:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(int32)
 			valb := b.(int32)
 			if vala > valb {
@@ -133,7 +118,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Int64:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(int64)
 			valb := b.(int64)
 			if vala > valb {
@@ -144,7 +129,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Uint:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(uint)
 			valb := b.(uint)
 			if vala > valb {
@@ -155,7 +140,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Uint8:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(uint8)
 			valb := b.(uint8)
 			if vala > valb {
@@ -166,7 +151,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Uint16:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(uint16)
 			valb := b.(uint16)
 			if vala > valb {
@@ -177,7 +162,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Uint32:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(uint32)
 			valb := b.(uint32)
 			if vala > valb {
@@ -188,7 +173,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Uint64:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(uint64)
 			valb := b.(uint64)
 			if vala > valb {
@@ -199,7 +184,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Float32:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(float32)
 			valb := b.(float32)
 			if vala > valb {
@@ -210,7 +195,7 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.Float64:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(float64)
 			valb := b.(float64)
 			if vala > valb {
@@ -221,14 +206,33 @@ func NewCollection[T any](values []T) *Collection[T] {
 			return 0
 		}
 	case reflect.String:
-		coll.cfun = func(a, b any) int {
+		return func(a, b any) int {
 			vala := a.(string)
 			valb := b.(string)
 			return strings.Compare(vala, valb)
 		}
 	default:
-		coll.cfun = nil
+		return nil
 	}
+}
+
+// Collection 主体
+type Collection[T any] struct {
+	value []T // 数组
+
+	// err error        // 错误信息
+	typ reflect.Type // collection 中每个元素的类型，在new的时候就定义了
+
+	compareFunc func(any, any) int // 比较函数，在new的时候定义了，也可以通过 SetCompare 方法进行设置
+}
+
+// NewCollection 初始化一个compare
+func NewCollection[T any](values []T) *Collection[T] {
+	var zero T
+	typ := reflect.TypeOf(zero)
+	coll := &Collection[T]{value: values, typ: typ}
+
+	coll.compareFunc = coll.newCompare(typ)
 
 	return coll
 }
@@ -250,8 +254,9 @@ func NewEmptyCollection[T any]() *Collection[T] {
 // }
 
 // SetCompare 设置比较函数
-func (c *Collection[T]) SetCompare(cfun func(a any, b any) int) *Collection[T] {
-	c.cfun = cfun
+// -1：小于，0：等于，1：大于
+func (c *Collection[T]) SetCompare(compareFunc func(a any, b any) int) *Collection[T] {
+	c.compareFunc = compareFunc
 	return c
 }
 
@@ -302,7 +307,7 @@ func (c *Collection[T]) Search(item T) (int, error) {
 	}
 
 	for i, v := range c.value {
-		if c.cfun(v, item) == 0 {
+		if c.compareFunc(v, item) == 0 {
 			return i, nil
 		}
 	}
@@ -328,7 +333,7 @@ func (c *Collection[T]) Unique() (*Collection[T], error) {
 	res := make([]T, 0, len(c.value))
 	inArr := func(item T, arr []T) bool {
 		for _, val := range arr {
-			if c.cfun(item, val) == 0 {
+			if c.compareFunc(item, val) == 0 {
 				return true
 			}
 		}
@@ -480,7 +485,17 @@ func (c *Collection[T]) Merge(arr *Collection[T]) *Collection[T] {
 }
 
 // Each 遍历
-func (c *Collection[T]) Each(f func(item T, key int)) {
+// 当 f 返回 false 时，终止
+func (c *Collection[T]) Each(f func(item T, key int) bool) {
+	for i, v := range c.value {
+		if !f(v, i) {
+			return
+		}
+	}
+}
+
+// ForEach 遍历，能保证每一个元素都被遍历到，内部决定是否跳过
+func (c *Collection[T]) Foreach(f func(item T, key int)) {
 	for i, v := range c.value {
 		f(v, i)
 	}
@@ -491,6 +506,20 @@ func (c *Collection[T]) Map(f func(item T, key int) T) *Collection[T] {
 	res := make([]T, 0, len(c.value))
 	for i, v := range c.value {
 		res = append(res, f(v, i))
+	}
+
+	return NewCollection[T](res)
+}
+
+// Map 映射并过滤
+// 映射后，可以过滤掉一些元素
+func (c *Collection[T]) MapFilter(f func(item T, key int) (T, bool)) *Collection[T] {
+	res := make([]T, 0, len(c.value))
+	for i, v := range c.value {
+		r, ok := f(v, i)
+		if ok {
+			res = append(res, r)
+		}
 	}
 
 	return NewCollection[T](res)
@@ -897,7 +926,7 @@ func (c *Collection[T]) Max() (T, error) {
 
 	maxElem := c.value[0]
 	for _, v := range c.value {
-		if c.cfun(v, maxElem) > 0 {
+		if c.compareFunc(v, maxElem) > 0 {
 			maxElem = v
 		}
 	}
@@ -922,7 +951,7 @@ func (c *Collection[T]) Min() (T, error) {
 
 	minElem := c.value[0]
 	for _, v := range c.value {
-		if c.cfun(v, minElem) < 0 {
+		if c.compareFunc(v, minElem) < 0 {
 			minElem = v
 		}
 	}
@@ -944,7 +973,7 @@ func (c *Collection[T]) Contains(obj T) (bool, error) {
 	}
 
 	for _, v := range c.value {
-		if c.cfun(v, obj) == 0 {
+		if c.compareFunc(v, obj) == 0 {
 			return true, nil
 		}
 	}
@@ -963,7 +992,7 @@ func (c *Collection[T]) ContainsCount(obj T) (int, error) {
 
 	count := 0
 	for _, v := range c.value {
-		if c.cfun(v, obj) == 0 {
+		if c.compareFunc(v, obj) == 0 {
 			count++
 		}
 	}
@@ -999,7 +1028,7 @@ func (c *Collection[T]) Sort() (*Collection[T], error) {
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
-		return c.cfun(c.value[i], c.value[j]) < 0
+		return c.compareFunc(c.value[i], c.value[j]) < 0
 	})
 	return c, nil
 }
@@ -1007,7 +1036,7 @@ func (c *Collection[T]) Sort() (*Collection[T], error) {
 // SortDesc 进行排序，倒序
 func (c *Collection[T]) SortDesc() *Collection[T] {
 	sort.Slice(c.value, func(i, j int) bool {
-		return c.cfun(c.value[i], c.value[j]) > 0
+		return c.compareFunc(c.value[i], c.value[j]) > 0
 	})
 	return c
 }
@@ -1138,7 +1167,7 @@ func (c *Collection[T]) Mode() (T, error) {
 	// 查找index的地址
 	indexSummary := func(item any, summary []tCount) int {
 		for i, val := range summary {
-			if c.cfun(val.item, item) == 0 {
+			if c.compareFunc(val.item, item) == 0 {
 				return i
 			}
 		}
