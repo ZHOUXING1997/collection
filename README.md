@@ -13,7 +13,7 @@ Collection包封装了对切片（Slice）的各种操作，使其更符合业�
 ## 安装
 
 ```bash
-go get github.com/ZHOUXING1997/collection
+go get github.com/ZHOUXING1997/collection@v0.0.5
 ```
 
 ## 支持的类型
@@ -83,14 +83,11 @@ contains := intColl.Contains(3)
 
 | 版本     | 说明                                                                         |
 |--------|----------------------------------------------------------------------------|
-| v1.4.2 | 增加KeyByStrField方法，增加交集和并集函数 Union，Intersect                                         |
-| v1.4.0 | 增加三种新类型 uint32, uint, uint64, 增加GroupBy 和 Split 方法                         |
-| v1.3.0 | 增加文档说明                                                                     |
-| 1.2.0  | 增加对象指针数组，增加测试覆盖率, 增加ToInterfaces方法                                         |
-| 1.1.2  | 增加一些空数组的判断，解决一些issue                                                       |
-| 1.1.1  | 对collection包进行了json解析和反解析的支持，对mix类型支持了SetField和RemoveFields的类型设置           |
-| 1.1.0  | 增加了对int32的支持，增加了延迟加载，增加了Copy函数，增加了compare从ICollection传递到IMix，使用快排加速了Sort方法 |
-| 1.0.1  | 第一次发布                                                                      |
+| v0.0.5 | 添加 pkg.go.dev 文档支持，完善包和主要类型的文档注释                                         |
+| v0.0.4 | 修复部分问题，优化代码结构                         |
+| v0.0.3 | 增加新的功能和测试用例                                                                     |
+| v0.0.2 | 修复初始版本的问题，改进性能                                         |
+| v0.0.1 | 初始版本，从 jianfengye/collection 项目分支而来                                                       |
 
 ## 许可证
 
