@@ -1,3 +1,11 @@
+// Package collection 提供了一组用于操作和处理各种数据类型集合的工具函数和结构。
+//
+// collection 包的目标是替代 Go 原生的切片操作，使集合操作更符合业务开发语义，
+// 提高开发效率。该包支持多种数据类型，包括基本类型（如 int, string, float）
+// 和结构体类型，并提供了丰富的方法来操作和转换这些数据。
+//
+// 主要功能包括：过滤、映射、排序、查找、聚合、分组等操作，使开发人员能够
+// 以更直观、更语义化的方式处理数据集合。
 package collection
 
 import (
@@ -190,7 +198,16 @@ func (c *Collection[T]) newCompare(kind reflect.Kind) func(any, any) int {
 	}
 }
 
-// Collection 主体
+// Collection 是集合操作的核心结构，实现了对各种数据类型的集合操作。
+//
+// Collection 使用泛型参数 T 来支持不同类型的数据，包括基本类型和结构体类型。
+// 它提供了丰富的方法来操作和转换这些数据，如过滤、映射、排序、查找、聚合等。
+//
+// 使用示例：
+//  intColl := NewCollection([]int{1, 2, 3, 4, 5})
+//  filtered := intColl.Filter(func(item int, key int) bool {
+//      return item > 2
+//  })
 type Collection[T any] struct {
 	value []T // 数组
 
@@ -200,7 +217,17 @@ type Collection[T any] struct {
 	compareFunc func(any, any) int // 比较函数，在new的时候定义了，也可以通过 SetCompare 方法进行设置
 }
 
-// NewCollection 初始化一个compare
+// NewCollection 创建并返回一个新的 Collection 实例。
+//
+// 该函数接收一个切片作为输入，并自动初始化适合该类型的比较函数。
+// 对于基本类型（如 int, string, float 等），会自动设置默认的比较函数。
+// 对于结构体类型，可能需要手动设置比较函数。
+//
+// 参数:
+//   - values: 要初始化的切片
+//
+// 返回:
+//   - *Collection[T]: 新创建的 Collection 实例
 func NewCollection[T any](values []T) *Collection[T] {
 	var zero T
 	typ := reflect.TypeOf(zero)
