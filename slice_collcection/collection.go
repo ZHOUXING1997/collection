@@ -6,7 +6,7 @@
 //
 // 主要功能包括：过滤、映射、排序、查找、聚合、分组等操作，使开发人员能够
 // 以更直观、更语义化的方式处理数据集合。
-package collection
+package slice_collcection
 
 import (
 	"encoding/json"
@@ -16,15 +16,10 @@ import (
 	"reflect"
 	"sort"
 	"time"
+
+	"github.com/ZHOUXING1997/collection/errorx"
+	"github.com/ZHOUXING1997/collection/utils"
 )
-
-// NoComputableError 不可计算
-var NoComputableError = errors.New("collection is not computable")
-var ElementNoComputableError = errors.New("element can not be computable")
-
-// KeyUnComparableError 不可比较
-var KeyUnComparableError = errors.New("key has unComparable type")
-var NoComparableError = errors.New("collection is not comparable")
 
 // 是结构体或者指针
 func (c *Collection[T]) isStructOrPointer() bool {
@@ -49,198 +44,7 @@ func (c *Collection[T]) isComparable() bool {
 
 // 是可以进行计算的
 func (c *Collection[T]) isComputable() bool {
-	return isComputableKind(c.typ.Kind())
-}
-
-// -1：小于，0：等于，1：大于
-func (c *Collection[T]) newCompare(kind reflect.Kind) func(any, any) int {
-	switch kind {
-	case reflect.Int:
-		return func(a, b any) int {
-			vala := a.(int)
-			valb := b.(int)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Int8:
-		return func(a, b any) int {
-			vala := a.(int8)
-			valb := b.(int8)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Int16:
-		return func(a, b any) int {
-			vala := a.(int16)
-			valb := b.(int16)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Int32:
-		return func(a, b any) int {
-			vala := a.(int32)
-			valb := b.(int32)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Int64:
-		return func(a, b any) int {
-			vala := a.(int64)
-			valb := b.(int64)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Uint:
-		return func(a, b any) int {
-			vala := a.(uint)
-			valb := b.(uint)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Uint8:
-		return func(a, b any) int {
-			vala := a.(uint8)
-			valb := b.(uint8)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Uint16:
-		return func(a, b any) int {
-			vala := a.(uint16)
-			valb := b.(uint16)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Uint32:
-		return func(a, b any) int {
-			vala := a.(uint32)
-			valb := b.(uint32)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Uint64:
-		return func(a, b any) int {
-			vala := a.(uint64)
-			valb := b.(uint64)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Float32:
-		return func(a, b any) int {
-			vala := a.(float32)
-			valb := b.(float32)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	case reflect.Float64:
-		return func(a, b any) int {
-			vala := a.(float64)
-			valb := b.(float64)
-			if vala > valb {
-				return 1
-			} else if vala < valb {
-				return -1
-			}
-			return 0
-		}
-	// case reflect.String: // 字符串排序有问题，这里不再自动注册，如果需要使用，请使用 SetCompare 进行注册
-	// 	return func(a, b any) int {
-	// 		vala := a.(string)
-	// 		valb := b.(string)
-	// 		return strings.Compare(vala, valb)
-	// 	}
-	default:
-		return nil
-	}
-}
-
-// Collection 是集合操作的核心结构，实现了对各种数据类型的集合操作。
-//
-// Collection 使用泛型参数 T 来支持不同类型的数据，包括基本类型和结构体类型。
-// 它提供了丰富的方法来操作和转换这些数据，如过滤、映射、排序、查找、聚合等。
-//
-// 使用示例：
-//  intColl := NewCollection([]int{1, 2, 3, 4, 5})
-//  filtered := intColl.Filter(func(item int, key int) bool {
-//      return item > 2
-//  })
-type Collection[T any] struct {
-	value []T // 数组
-
-	// err error        // 错误信息
-	typ reflect.Type // collection 中每个元素的类型，在new的时候就定义了
-
-	compareFunc func(any, any) int // 比较函数，在new的时候定义了，也可以通过 SetCompare 方法进行设置
-}
-
-// NewCollection 创建并返回一个新的 Collection 实例。
-//
-// 该函数接收一个切片作为输入，并自动初始化适合该类型的比较函数。
-// 对于基本类型（如 int, string, float 等），会自动设置默认的比较函数。
-// 对于结构体类型，可能需要手动设置比较函数。
-//
-// 参数:
-//   - values: 要初始化的切片
-//
-// 返回:
-//   - *Collection[T]: 新创建的 Collection 实例
-func NewCollection[T any](values []T) *Collection[T] {
-	var zero T
-	typ := reflect.TypeOf(zero)
-	coll := &Collection[T]{value: values, typ: typ}
-
-	coll.compareFunc = coll.newCompare(typ.Kind())
-
-	return coll
-}
-
-// NewEmptyCollection 返回一个空的Collection
-func NewEmptyCollection[T any]() *Collection[T] {
-	return NewCollection[T](nil)
+	return utils.IsComputableKind(c.typ.Kind())
 }
 
 // // Err 返回Collection的错误信息
@@ -304,7 +108,7 @@ func (c *Collection[T]) Search(item T) (int, error) {
 	if !c.isComparable() {
 		// c.SetErr(errors.New("element can not be comparable"))
 		// return 0
-		return -1, ElementNoComputableError
+		return -1, errorx.ElementNoComputableError
 	}
 
 	for i, v := range c.value {
@@ -313,7 +117,7 @@ func (c *Collection[T]) Search(item T) (int, error) {
 		}
 	}
 
-	return -1, fmt.Errorf("not found")
+	return -1, errorx.NotFoundError
 }
 
 // Unique 去重
@@ -327,7 +131,7 @@ func (c *Collection[T]) Unique() (*Collection[T], error) {
 	// }
 
 	if !c.isComparable() {
-		return c, ElementNoComputableError
+		return c, errorx.ElementNoComputableError
 	}
 
 	// 过滤数组中重复的元素，仅对基础Collection生效
@@ -715,9 +519,9 @@ func (c *Collection[T]) PluckString(key string) (*Collection[string], error) {
 		}
 		kind := val.Type().Kind()
 		if kind != reflect.String {
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 			// return nil
-			return nil, errors.New("invalid type")
+			return nil, errorx.InvalidTypeError
 		}
 
 		res = append(res, val.String())
@@ -737,10 +541,10 @@ func (c *Collection[T]) PluckInt64(key string) (*Collection[int64], error) {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanInt() {
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 			// return nil
 
-			return nil, errors.New("invalid type")
+			return nil, errorx.InvalidTypeError
 		}
 
 		res = append(res, val.Int())
@@ -760,10 +564,10 @@ func (c *Collection[T]) PluckFloat64(key string) (*Collection[float64], error) {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanFloat() {
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 			// return nil
 
-			return nil, errors.New("invalid type")
+			return nil, errorx.InvalidTypeError
 		}
 
 		res = append(res, val.Float())
@@ -783,10 +587,10 @@ func (c *Collection[T]) PluckUint64(key string) (*Collection[uint64], error) {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if !val.CanUint() {
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 			// return nil
 
-			return nil, errors.New("invalid type")
+			return nil, errorx.InvalidTypeError
 		}
 
 		res = append(res, val.Uint())
@@ -806,10 +610,10 @@ func (c *Collection[T]) PluckBool(key string) (*Collection[bool], error) {
 			val = reflect.ValueOf(v).FieldByName(key)
 		}
 		if val.Kind() != reflect.Bool {
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 			// return nil
 
-			return nil, errors.New("invalid type")
+			return nil, errorx.InvalidTypeError
 		}
 
 		res = append(res, val.Bool())
@@ -840,9 +644,9 @@ func (c *Collection[T]) SortBy(key string) (*Collection[T], error) {
 	}
 
 	// 使用闭包避免重复反射操作
-	lessFunc := c.newCompare(field.Type.Kind())
+	lessFunc := utils.NewCompareFunc(field.Type.Kind())
 	if lessFunc == nil {
-		return c, KeyUnComparableError
+		return c, errorx.KeyUnComparableError
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
@@ -885,14 +689,14 @@ func (c *Collection[T]) SortFloatBy(key string) (*Collection[T], error) {
 		return c, fmt.Errorf("field %s does not exist", key)
 	}
 
-	if !isComputableKind(field.Type.Kind()) && field.Type.Kind() != reflect.String {
+	if !utils.IsComputableKind(field.Type.Kind()) && field.Type.Kind() != reflect.String {
 		return c, fmt.Errorf("field %s is not computable", key)
 	}
 
 	// 使用闭包避免重复反射操作
-	lessFunc := c.newCompare(reflect.Float64)
+	lessFunc := utils.NewCompareFunc(reflect.Float64)
 	if lessFunc == nil {
-		return c, KeyUnComparableError
+		return c, errorx.KeyUnComparableError
 	}
 
 	var err error
@@ -908,12 +712,12 @@ func (c *Collection[T]) SortFloatBy(key string) (*Collection[T], error) {
 		}
 
 		var v1f, v2f float64
-		v1f, err = any2Float(val1.Interface())
+		v1f, err = utils.Any2Float(val1.Interface())
 		if err != nil {
 			return false
 		}
 
-		v2f, err = any2Float(val2.Interface())
+		v2f, err = utils.Any2Float(val2.Interface())
 		if err != nil {
 			return false
 		}
@@ -955,9 +759,9 @@ func (c *Collection[T]) SortByDesc(key string) (*Collection[T], error) {
 	}
 
 	// 使用闭包避免重复反射操作
-	lessFunc := c.newCompare(field.Type.Kind())
+	lessFunc := utils.NewCompareFunc(field.Type.Kind())
 	if lessFunc == nil {
-		return c, KeyUnComparableError
+		return c, errorx.KeyUnComparableError
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
@@ -1003,7 +807,7 @@ func (c *Collection[T]) Max() (T, error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return zero
 
-		return zero, NoComparableError
+		return zero, errorx.NoComparableError
 	}
 
 	if c.IsEmpty() {
@@ -1028,7 +832,7 @@ func (c *Collection[T]) Min() (T, error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return zero
 
-		return zero, NoComparableError
+		return zero, errorx.NoComparableError
 	}
 
 	if c.IsEmpty() {
@@ -1051,7 +855,7 @@ func (c *Collection[T]) Contains(obj T) (bool, error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return false
 
-		return false, NoComparableError
+		return false, errorx.NoComparableError
 	}
 
 	if c.IsEmpty() {
@@ -1073,7 +877,7 @@ func (c *Collection[T]) ContainsCount(obj T) (int, error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return 0
 
-		return 0, NoComparableError
+		return 0, errorx.NoComparableError
 	}
 
 	count := 0
@@ -1090,7 +894,7 @@ func (c *Collection[T]) ContainsCount(obj T) (int, error) {
 func (c *Collection[T]) Diff(arr *Collection[T]) (*Collection[T], error) {
 	if !c.isComparable() {
 		// c.SetErr(errors.New("collection is not comparable"))
-		return c, NoComparableError
+		return c, errorx.NoComparableError
 	}
 
 	res := NewCollection([]T{})
@@ -1110,7 +914,7 @@ func (c *Collection[T]) Sort() (*Collection[T], error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return nil
 
-		return nil, NoComparableError
+		return nil, errorx.NoComparableError
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
@@ -1125,7 +929,7 @@ func (c *Collection[T]) SortDesc() (*Collection[T], error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return nil
 
-		return nil, NoComparableError
+		return nil, errorx.NoComparableError
 	}
 
 	sort.Slice(c.value, func(i, j int) bool {
@@ -1158,7 +962,7 @@ func (c *Collection[T]) Union(arr *Collection[T]) (*Collection[T], error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return nil
 
-		return nil, NoComparableError
+		return nil, errorx.NoComparableError
 	}
 
 	res := c.Copy()
@@ -1179,7 +983,7 @@ func (c *Collection[T]) Intersect(arr *Collection[T]) (*Collection[T], error) {
 		// c.SetErr(errors.New("collection is not comparable"))
 		// return nil
 
-		return nil, NoComparableError
+		return nil, errorx.NoComparableError
 	}
 
 	res := NewCollection([]T{})
@@ -1200,7 +1004,7 @@ func (c *Collection[T]) Avg() (float64, error) {
 		// c.SetErr(errors.New("collection is not floatable"))
 		// return 0.0
 
-		return 0.0, NoComputableError
+		return 0.0, errorx.NoComputableError
 	}
 
 	if c.IsEmpty() {
@@ -1221,7 +1025,7 @@ func (c *Collection[T]) Median() (float64, error) {
 	if !c.isComputable() {
 		// c.SetErr(errors.New("collection is not floatable"))
 
-		return 0.0, NoComputableError
+		return 0.0, errorx.NoComputableError
 	}
 
 	coll, err := c.Sort()
@@ -1249,7 +1053,7 @@ func (c *Collection[T]) Mode() (T, error) {
 	var zero T
 	if !c.isComparable() {
 		// c.SetErr(errors.New("collection is not comparable"))
-		return zero, NoComparableError
+		return zero, errorx.NoComparableError
 	}
 
 	if c.IsEmpty() {
@@ -1300,7 +1104,7 @@ func (c *Collection[T]) Sum() (float64, error) {
 	}
 	if !c.isComputable() {
 		// c.SetErr(errors.New("collection is not floatable"))
-		return 0.0, NoComputableError
+		return 0.0, errorx.NoComputableError
 	}
 
 	sum := float64(0)
@@ -1313,7 +1117,7 @@ func (c *Collection[T]) Sum() (float64, error) {
 		case reflect.Float32, reflect.Float64:
 			sum += reflect.ValueOf(item).Float()
 		default:
-			// c.SetErr(errors.New("invalid type"))
+			// c.SetErr(InvalidTypeError)
 
 			return 0.0, fmt.Errorf("unsupported type: %T", item)
 		}
