@@ -21,9 +21,6 @@ type Collection[K comparable, V any] struct {
 	sortedKeys []K
 }
 
-// CollectionOption 是用于配置 Collection 的函数式选项
-type CollectionOption[K comparable, V any] func(*Collection[K, V])
-
 // WithKeyCompare 设置 key 的比较函数（用于排序）
 // compareFunc: 比较函数，返回 -1(小于)、0(等于)、1(大于)
 func WithKeyCompare[K comparable, V any](compareFunc func(K, K) int) CollectionOption[K, V] {
