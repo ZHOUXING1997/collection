@@ -590,3 +590,368 @@ func TestPluckFunc(t *testing.T) {
 		t.Error("PluckFunc did not extract all ages correctly")
 	}
 }
+
+// ========== 极限场景测试 ==========
+
+// 测试空集合的基本操作
+func TestEmptyCollectionOperations(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	// 测试 Count
+	if c.Count() != 0 {
+		t.Errorf("Empty collection Count should be 0, got %d", c.Count())
+	}
+
+	// 测试 IsEmpty
+	if !c.IsEmpty() {
+		t.Error("Empty collection should return true for IsEmpty")
+	}
+
+	// 测试 Keys
+	keys := c.Keys()
+	if len(keys) != 0 {
+		t.Errorf("Empty collection Keys should return empty slice, got %d keys", len(keys))
+	}
+
+	// 测试 Values
+	values := c.Values()
+	if len(values) != 0 {
+		t.Errorf("Empty collection Values should return empty slice, got %d values", len(values))
+	}
+
+	// 测试 All
+	all := c.All()
+	if len(all) != 0 {
+		t.Errorf("Empty collection All should return empty map, got %d items", len(all))
+	}
+}
+
+// 测试空集合的迭代操作
+func TestEmptyCollectionIteration(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	// 测试 Each - 不应该执行任何迭代
+	count := 0
+	c.Each(func(v int, k string) {
+		count++
+	})
+	if count != 0 {
+		t.Errorf("Each on empty collection should not iterate, but iterated %d times", count)
+	}
+
+	// 测试 Foreach
+	count = 0
+	c.Foreach(func(v int, k string) {
+		count++
+	})
+	if count != 0 {
+		t.Errorf("Foreach on empty collection should not iterate, but iterated %d times", count)
+	}
+
+	// 测试 Map - 应返回空集合
+	mapped := c.Map(func(v int, k string) int {
+		return v * 2
+	})
+	if !mapped.IsEmpty() {
+		t.Error("Map on empty collection should return empty collection")
+	}
+
+	// 测试 Reduce - 应返回初始值
+	result := c.Reduce(100, func(acc any, v int, k string) any {
+		return acc.(int) + v
+	})
+	if result.(int) != 100 {
+		t.Errorf("Reduce on empty collection should return initial value 100, got %d", result)
+	}
+}
+
+// 测试空集合的过滤和筛选
+func TestEmptyCollectionFiltering(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	// 测试 Filter
+	filtered := c.Filter(func(v int, k string) bool {
+		return v > 0
+	})
+	if !filtered.IsEmpty() {
+		t.Error("Filter on empty collection should return empty collection")
+	}
+
+	// 测试 Only
+	only := c.Only([]string{"a", "b"})
+	if !only.IsEmpty() {
+		t.Error("Only on empty collection should return empty collection")
+	}
+
+	// 测试 Except
+	except := c.Except([]string{"a", "b"})
+	if !except.IsEmpty() {
+		t.Error("Except on empty collection should return empty collection")
+	}
+}
+
+// 测试空集合的查找操作
+func TestEmptyCollectionSearch(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	// FirstWhere 应返回 false
+	_, _, ok := c.FirstWhere(func(v int, k string) bool {
+		return v > 0
+	})
+	if ok {
+		t.Error("FirstWhere on empty collection should return false")
+	}
+
+	// LastWhere 应返回 false
+	_, _, ok = c.LastWhere(func(v int, k string) bool {
+		return v > 0
+	})
+	if ok {
+		t.Error("LastWhere on empty collection should return false")
+	}
+}
+
+// 测试空集合的序列化
+func TestEmptyCollectionToJSON(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	jsonStr, err := c.ToJSON()
+	if err != nil {
+		t.Errorf("ToJSON on empty collection returned error: %v", err)
+	}
+
+	// 应该是空对象 {}
+	var result map[string]int
+	err = json.Unmarshal([]byte(jsonStr), &result)
+	if err != nil {
+		t.Errorf("Failed to unmarshal empty collection JSON: %v", err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("Empty collection JSON should produce empty map, got %d items", len(result))
+	}
+}
+
+// 测试空集合的复制和合并
+func TestEmptyCollectionCopyAndMerge(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{})
+
+	// 测试 Copy
+	copied := c.Copy()
+	if !copied.IsEmpty() {
+		t.Error("Copy of empty collection should be empty")
+	}
+
+	// 测试 Merge 空map
+	merged := c.Merge(map[string]int{})
+	if !merged.IsEmpty() {
+		t.Error("Merge empty with empty should return empty")
+	}
+
+	// 测试 Merge 非空map
+	merged2 := c.Merge(map[string]int{"a": 1})
+	if merged2.Count() != 1 {
+		t.Error("Merge empty with non-empty should return non-empty")
+	}
+
+	// 测试 MergeCollection nil
+	merged3 := c.MergeCollection(nil)
+	if !merged3.IsEmpty() {
+		t.Error("MergeCollection with nil should return empty")
+	}
+}
+
+// 测试删除所有元素 - 核心场景
+func TestDeleteAllElements(t *testing.T) {
+	// 测试 Delete 删除所有元素
+	c := map_collection.NewCollection(map[string]int{"a": 1, "b": 2})
+	c = c.Delete("a")
+	c = c.Delete("b")
+
+	if !c.IsEmpty() {
+		t.Error("After deleting all elements, collection should be empty")
+	}
+	if c.Count() != 0 {
+		t.Errorf("After deleting all elements, Count should be 0, got %d", c.Count())
+	}
+
+	// 测试 Remove 删除所有元素
+	c2 := map_collection.NewCollection(map[string]int{"a": 1, "b": 2})
+	c2.Remove("a")
+	c2.Remove("b")
+
+	if !c2.IsEmpty() {
+		t.Error("After removing all elements, collection should be empty")
+	}
+}
+
+// 测试 DeleteByFunc 删除所有元素
+func TestDeleteByFuncAllElements(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 2, "b": 4, "c": 6})
+
+	// 删除所有偶数(实际上删除所有元素)
+	result := c.DeleteByFunc(func(k string, v int) bool {
+		return v%2 == 0
+	})
+
+	if !result.IsEmpty() {
+		t.Error("DeleteByFunc removing all elements should return empty collection")
+	}
+	if result.Count() != 0 {
+		t.Errorf("DeleteByFunc removing all elements should have Count 0, got %d", result.Count())
+	}
+
+	// 原集合不应改变
+	if c.Count() != 3 {
+		t.Error("DeleteByFunc should not modify original collection")
+	}
+}
+
+// 测试 Filter 结果为空
+func TestFilterResultEmpty(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 1, "b": 3, "c": 5})
+
+	// 过滤偶数,但没有偶数
+	result := c.Filter(func(v int, k string) bool {
+		return v%2 == 0
+	})
+
+	if !result.IsEmpty() {
+		t.Error("Filter with no matches should return empty collection")
+	}
+	if result.Count() != 0 {
+		t.Errorf("Filter with no matches should have Count 0, got %d", result.Count())
+	}
+}
+
+// 测试 Only 结果为空
+func TestOnlyResultEmpty(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 1, "b": 2, "c": 3})
+
+	// 保留不存在的keys
+	result := c.Only([]string{"x", "y", "z"})
+
+	if !result.IsEmpty() {
+		t.Error("Only with non-existent keys should return empty collection")
+	}
+	if result.Count() != 0 {
+		t.Errorf("Only with non-existent keys should have Count 0, got %d", result.Count())
+	}
+
+	// 测试 Only 传入空切片
+	result2 := c.Only([]string{})
+	if !result2.IsEmpty() {
+		t.Error("Only with empty keys slice should return empty collection")
+	}
+}
+
+// 测试 Except 结果为空
+func TestExceptResultEmpty(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 1, "b": 2, "c": 3})
+
+	// 排除所有keys
+	result := c.Except([]string{"a", "b", "c"})
+
+	if !result.IsEmpty() {
+		t.Error("Except excluding all keys should return empty collection")
+	}
+	if result.Count() != 0 {
+		t.Errorf("Except excluding all keys should have Count 0, got %d", result.Count())
+	}
+
+	// 测试 Except 传入空切片
+	result2 := c.Except([]string{})
+	if result2.Count() != 3 {
+		t.Error("Except with empty keys slice should return all elements")
+	}
+}
+
+// 测试单元素集合的操作
+func TestSingleElementCollection(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 1})
+
+	// 测试基本操作
+	if c.Count() != 1 {
+		t.Error("Single element collection should have Count 1")
+	}
+	if c.IsEmpty() {
+		t.Error("Single element collection should not be empty")
+	}
+
+	// 测试 Filter 保留
+	filtered := c.Filter(func(v int, k string) bool {
+		return v == 1
+	})
+	if filtered.Count() != 1 {
+		t.Error("Filter keeping single element should return collection with 1 element")
+	}
+
+	// 测试 Filter 删除
+	filtered2 := c.Filter(func(v int, k string) bool {
+		return v == 2
+	})
+	if !filtered2.IsEmpty() {
+		t.Error("Filter removing single element should return empty collection")
+	}
+
+	// 测试 Map
+	mapped := c.Map(func(v int, k string) int {
+		return v * 2
+	})
+	if mapped.Count() != 1 {
+		t.Error("Map on single element should return collection with 1 element")
+	}
+	if mapped.GetValue("a") != 2 {
+		t.Error("Map should transform the single element")
+	}
+
+	// 测试 Reduce
+	result := c.Reduce(10, func(acc any, v int, k string) any {
+		return acc.(int) + v
+	})
+	if result.(int) != 11 {
+		t.Errorf("Reduce on single element should return 11, got %d", result)
+	}
+
+	// 测试删除单个元素后变空
+	deleted := c.Delete("a")
+	if !deleted.IsEmpty() {
+		t.Error("Delete single element should return empty collection")
+	}
+}
+
+// 测试单元素集合删除后为空
+func TestSingleElementDeleteToEmpty(t *testing.T) {
+	c := map_collection.NewCollection(map[string]int{"a": 1})
+
+	c.Remove("a")
+
+	if !c.IsEmpty() {
+		t.Error("After removing single element, collection should be empty")
+	}
+	if c.Count() != 0 {
+		t.Errorf("After removing single element, Count should be 0, got %d", c.Count())
+	}
+}
+
+// 测试 Pluck 在空集合上
+func TestPluckOnEmptyCollection(t *testing.T) {
+	c := map_collection.NewCollection(map[string]Person{})
+
+	names := c.Pluck("Name")
+	if len(names) != 0 {
+		t.Errorf("Pluck on empty collection should return empty slice, got %d items", len(names))
+	}
+}
+
+// 测试 PluckFunc 在空集合上
+func TestPluckFuncOnEmptyCollection(t *testing.T) {
+	c := map_collection.NewCollection(map[string]Person{})
+
+	ages := c.PluckFunc(func(p Person) any {
+		return p.Age
+	})
+	if len(ages) != 0 {
+		t.Errorf("PluckFunc on empty collection should return empty slice, got %d items", len(ages))
+	}
+}

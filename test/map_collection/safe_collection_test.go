@@ -347,3 +347,374 @@ func TestSafeCollectionConcurrentOrderKey(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// ========== 极限场景测试 ==========
+
+// 测试空SafeCollection的并发操作
+func TestEmptySafeCollectionConcurrentOps(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+	errors := make(chan error, 100)
+
+	// 阶段1: 并发读取空集合
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if !sc.IsEmpty() {
+				errors <- fmt.Errorf("Empty collection should return true for IsEmpty")
+			}
+			if sc.Count() != 0 {
+				errors <- fmt.Errorf("Empty collection Count should be 0, got %d", sc.Count())
+			}
+		}()
+	}
+
+	// 等待所有读取完成
+	wg.Wait()
+	close(errors)
+
+	for err := range errors {
+		t.Error(err)
+	}
+
+	// 阶段2: 并发向空集合写入
+	var wg2 sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg2.Add(1)
+		go func(id int) {
+			defer wg2.Done()
+			key := fmt.Sprintf("key%d", id)
+			sc.Set(key, id)
+		}(i)
+	}
+
+	wg2.Wait()
+
+	// 验证最终状态
+	if sc.Count() != 20 {
+		t.Errorf("After concurrent writes, expected count 20, got %d", sc.Count())
+	}
+}
+
+// 测试并发删除所有元素
+func TestSafeCollectionConcurrentDeleteAll(t *testing.T) {
+	// 创建包含一些元素的集合
+	sc := map_collection.NewSafeCollection(map[string]int{
+		"a": 1, "b": 2, "c": 3, "d": 4, "e": 5,
+	})
+
+	var wg sync.WaitGroup
+
+	// 并发删除所有元素
+	keys := []string{"a", "b", "c", "d", "e"}
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			sc.Remove(k)
+		}(key)
+	}
+
+	wg.Wait()
+
+	// 验证集合为空
+	if !sc.IsEmpty() {
+		t.Error("After deleting all elements concurrently, collection should be empty")
+	}
+	if sc.Count() != 0 {
+		t.Errorf("After deleting all elements, Count should be 0, got %d", sc.Count())
+	}
+}
+
+// 测试并发删除和添加,最终为空
+func TestSafeCollectionConcurrentDeleteAndAddToEmpty(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{
+		"a": 1, "b": 2,
+	})
+
+	var wg sync.WaitGroup
+
+	// 先删除所有现有元素
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sc.Remove("a")
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sc.Remove("b")
+	}()
+
+	// 添加临时元素
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		sc.Set("temp", 99)
+	}()
+
+	wg.Wait()
+
+	// 删除临时元素
+	sc.Remove("temp")
+
+	// 验证最终为空
+	if !sc.IsEmpty() {
+		t.Error("After all operations, collection should be empty")
+	}
+}
+
+// 测试空集合的并发First/Last
+func TestEmptySafeCollectionConcurrentFirstLast(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+	errors := make(chan error, 40)
+
+	// 并发调用First
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, ok := sc.First()
+			if ok {
+				errors <- fmt.Errorf("First on empty collection should return false")
+			}
+		}()
+	}
+
+	// 并发调用Last
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, ok := sc.Last()
+			if ok {
+				errors <- fmt.Errorf("Last on empty collection should return false")
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errors)
+
+	for err := range errors {
+		t.Error(err)
+	}
+}
+
+// 测试空集合的并发迭代
+func TestEmptySafeCollectionConcurrentEach(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+	var iterCount int
+	var mu sync.Mutex
+
+	// 并发调用Each
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sc.Each(func(v int, k string) {
+				mu.Lock()
+				iterCount++
+				mu.Unlock()
+			})
+		}()
+	}
+
+	wg.Wait()
+
+	if iterCount != 0 {
+		t.Errorf("Each on empty collection should not iterate, but iterated %d times", iterCount)
+	}
+}
+
+// 测试空集合的并发Filter
+func TestEmptySafeCollectionConcurrentFilter(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+
+	// 并发Filter空集合
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			filtered := sc.Filter(func(v int, k string) bool {
+				return v > 0
+			})
+			if !filtered.IsEmpty() {
+				t.Error("Filter on empty collection should return empty collection")
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+// 测试并发删除直到为空后再读取
+func TestSafeCollectionDeleteToEmptyThenRead(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{
+		"a": 1, "b": 2, "c": 3,
+	})
+
+	var wg sync.WaitGroup
+
+	// 并发删除所有元素
+	keys := []string{"a", "b", "c"}
+	for _, key := range keys {
+		wg.Add(1)
+		go func(k string) {
+			defer wg.Done()
+			sc.Remove(k)
+		}(key)
+	}
+
+	wg.Wait()
+
+	// 并发读取空集合
+	errors := make(chan error, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if !sc.IsEmpty() {
+				errors <- fmt.Errorf("Collection should be empty after deleting all elements")
+			}
+			keys := sc.Keys()
+			if len(keys) != 0 {
+				errors <- fmt.Errorf("Keys should return empty slice, got %d keys", len(keys))
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errors)
+
+	for err := range errors {
+		t.Error(err)
+	}
+}
+
+// 测试单元素SafeCollection并发删除
+func TestSingleElementSafeCollectionConcurrentDelete(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{
+		"only": 1,
+	})
+
+	var wg sync.WaitGroup
+
+	// 多个goroutine尝试删除同一个元素
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sc.Remove("only")
+		}()
+	}
+
+	wg.Wait()
+
+	// 验证集合为空
+	if !sc.IsEmpty() {
+		t.Error("After concurrent delete of single element, collection should be empty")
+	}
+	if sc.Count() != 0 {
+		t.Errorf("After deleting single element, Count should be 0, got %d", sc.Count())
+	}
+}
+
+// 测试并发Copy空集合
+func TestEmptySafeCollectionConcurrentCopy(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+	copies := make([]*map_collection.SafeCollection[string, int], 10)
+
+	// 并发Copy空集合
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			copies[id] = sc.Copy()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证所有副本都是空的
+	for i, copy := range copies {
+		if !copy.IsEmpty() {
+			t.Errorf("Copy %d of empty collection should be empty", i)
+		}
+		if copy.Count() != 0 {
+			t.Errorf("Copy %d should have count 0, got %d", i, copy.Count())
+		}
+	}
+}
+
+// 测试并发Merge空集合
+func TestEmptySafeCollectionConcurrentMergeEmpty(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{})
+
+	var wg sync.WaitGroup
+
+	// 并发Merge空map到空集合
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			if id%2 == 0 {
+				// 一半merge空map
+				sc.MergeInPlace(map[string]int{})
+			} else {
+				// 一半merge非空map
+				sc.MergeInPlace(map[string]int{
+					fmt.Sprintf("key%d", id): id,
+				})
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证只有奇数id的key被添加
+	if sc.IsEmpty() {
+		t.Error("After merging some non-empty maps, collection should not be empty")
+	}
+}
+
+// 测试并发Filter结果为空
+func TestSafeCollectionConcurrentFilterToEmpty(t *testing.T) {
+	sc := map_collection.NewSafeCollection(map[string]int{
+		"a": 1, "b": 3, "c": 5,
+	})
+
+	var wg sync.WaitGroup
+
+	// 并发Filter,结果都为空(过滤偶数,但没有偶数)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			filtered := sc.Filter(func(v int, k string) bool {
+				return v%2 == 0
+			})
+			if !filtered.IsEmpty() {
+				t.Error("Filter with no matches should return empty collection")
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// 原集合不应改变
+	if sc.Count() != 3 {
+		t.Error("Filter should not modify original collection")
+	}
+}

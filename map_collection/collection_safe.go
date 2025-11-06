@@ -1,24 +1,5 @@
 package map_collection
 
-import (
-	"sync"
-)
-
-// SafeCollection 是 Collection 的线程安全包装器
-// 使用读写锁(RWMutex)保护底层Collection，支持并发读取和安全的写入
-type SafeCollection[K comparable, V any] struct {
-	mu   sync.RWMutex
-	coll *Collection[K, V]
-}
-
-// NewSafeCollection 创建一个线程安全的 Collection 包装器
-// 支持函数式选项模式配置比较函数
-func NewSafeCollection[T ~map[K]V, K comparable, V any](values T, opts ...CollectionOption[K, V]) *SafeCollection[K, V] {
-	return &SafeCollection[K, V]{
-		coll: NewCollection(values, opts...),
-	}
-}
-
 // Copy 返回一个新的线程安全的 Collection 副本
 func (sc *SafeCollection[K, V]) Copy() *SafeCollection[K, V] {
 	sc.mu.RLock()

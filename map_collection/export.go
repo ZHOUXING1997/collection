@@ -2,7 +2,24 @@ package map_collection
 
 import (
 	"reflect"
+	"sync"
 )
+
+// Collection 是集合操作的核心结构，实现了对各种数据类型的集合操作。
+// Collection 是针对map类型的集合操作核心结构
+type Collection[K comparable, V any] struct {
+	value map[K]V      // map数据
+	vType reflect.Type // value中值的类型
+	kType reflect.Type // key的类型
+
+	// 比较函数，用于值的比较
+	valCompareFunc func(V, V) int
+	// key的比较函数，用于key的排序等操作
+	keyCompareFunc func(K, K) int
+
+	// 缓存排序后的keys,用于稳定的First/Last操作
+	sortedKeys []K
+}
 
 // CollectionOption 是用于配置 Collection 的函数式选项
 type CollectionOption[K comparable, V any] func(*Collection[K, V])
@@ -46,4 +63,19 @@ func NewCollection[T ~map[K]V, K comparable, V any](values T, opts ...Collection
 	}
 
 	return coll
+}
+
+// SafeCollection 是 Collection 的线程安全包装器
+// 使用读写锁(RWMutex)保护底层Collection，支持并发读取和安全的写入
+type SafeCollection[K comparable, V any] struct {
+	mu   sync.RWMutex
+	coll *Collection[K, V]
+}
+
+// NewSafeCollection 创建一个线程安全的 Collection 包装器
+// 支持函数式选项模式配置比较函数
+func NewSafeCollection[T ~map[K]V, K comparable, V any](values T, opts ...CollectionOption[K, V]) *SafeCollection[K, V] {
+	return &SafeCollection[K, V]{
+		coll: NewCollection(values, opts...),
+	}
 }
