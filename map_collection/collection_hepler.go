@@ -40,18 +40,24 @@ func (c *Collection[K, V]) insertKeyInOrder(key K) {
 
 // removeKeyFromSorted 从 sortedKeys 中移除指定的 key
 func (c *Collection[K, V]) removeKeyFromSorted(keys ...K) {
-	if c.sortedKeys == nil {
+	if c.sortedKeys == nil || len(keys) == 0 {
 		return
 	}
 
-	for i, k := range c.sortedKeys {
-		if slices.Contains(keys, k) {
-			c.sortedKeys = slices.Delete(c.sortedKeys, i, i+1)
-			if len(keys) == 0 {
-				break
-			}
+	// 创建keys的查找map
+	keyMap := make(map[K]bool, len(keys))
+	for _, k := range keys {
+		keyMap[k] = true
+	}
+
+	// 过滤sortedKeys,保留不在keys中的元素
+	filtered := make([]K, 0, len(c.sortedKeys))
+	for _, k := range c.sortedKeys {
+		if !keyMap[k] {
+			filtered = append(filtered, k)
 		}
 	}
+	c.sortedKeys = filtered
 }
 
 // cloneWithSortedKeys 内部方法：克隆 Collection 并继承排序信息

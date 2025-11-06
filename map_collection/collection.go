@@ -59,15 +59,8 @@ func (c *Collection[K, V]) Has(key K) bool {
 	return Has(c.value, key)
 }
 
-// Set 设置 key->val（不修改原 Collection，返回新的 Collection）
+// Set 设置 key->val（直接修改当前 Collection，返回自身以支持链式调用）
 func (c *Collection[K, V]) Set(key K, val V) *Collection[K, V] {
-	newMap := Set(c.value, key, val)
-
-	return NewCollection(newMap)
-}
-
-// Put 设置 key->val（直接修改当前 Collection，返回自身以支持链式调用）
-func (c *Collection[K, V]) Put(key K, val V) *Collection[K, V] {
 	_, exists := c.value[key]
 	c.value[key] = val
 
@@ -77,6 +70,22 @@ func (c *Collection[K, V]) Put(key K, val V) *Collection[K, V] {
 	}
 
 	return c
+}
+
+// Put 设置 key->val（不修改原 Collection，返回新的 Collection）
+func (c *Collection[K, V]) Put(key K, val V) *Collection[K, V] {
+	// 检查是否是新增的 key
+	_, exists := c.value[key]
+
+	newMap := Set(c.value, key, val)
+	newColl := c.cloneWithSortedKeys(newMap)
+
+	// 如果是新增的 key，插入到 sortedKeys
+	if !exists {
+		newColl.insertKeyInOrder(key)
+	}
+
+	return newColl
 }
 
 // Delete 删除指定的 key（不修改原 Collection，返回新的 Collection）
@@ -90,19 +99,21 @@ func (c *Collection[K, V]) Delete(key K) *Collection[K, V] {
 	return newColl
 }
 
-// Delete 删除指定的 key（不修改原 Collection，返回新的 Collection）
+// DeleteByFunc 删除满足条件的 key（不修改原 Collection，返回新的 Collection）
 func (c *Collection[K, V]) DeleteByFunc(fn func(K, V) bool) *Collection[K, V] {
 	newMap := Clone(c.value)
+	deletedKeys := make([]K, 0)
 	for k, v := range newMap {
 		if fn(k, v) {
 			delete(newMap, k)
+			deletedKeys = append(deletedKeys, k)
 		}
 	}
 
 	newColl := c.cloneWithSortedKeys(newMap)
 
-	// 从新 Collection 的 sortedKeys 中移除
-	newColl.removeKeyFromSorted(Keys(newMap)...)
+	// 从新 Collection 的 sortedKeys 中移除被删除的keys
+	newColl.removeKeyFromSorted(deletedKeys...)
 
 	return newColl
 }

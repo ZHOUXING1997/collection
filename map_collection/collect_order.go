@@ -35,7 +35,7 @@ func (c *Collection[K, V]) OrderKey() (*Collection[K, V], error) {
 // OrderKeyByFunc 设置 key 的比较函数并立即排序
 // -1：小于，0：等于，1：大于
 func (c *Collection[K, V]) OrderKeyByFunc(fn func(K, K) int) (*Collection[K, V], error) {
-	if c.keyCompareFunc == nil {
+	if fn == nil {
 		return c, errorx.NilFunc
 	}
 
