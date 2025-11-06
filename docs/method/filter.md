@@ -1,21 +1,18 @@
 # Filter
 
-`Filter(func(item interface{}, key int) bool) ICollection`
+适用集合：slice_collcection
 
-根据过滤函数获取Collection过滤后的元素。
+`Filter(func(item T, key int) bool) *Collection[T]`
+
+根据过滤函数返回保留的元素，生成新的集合。
 
 ```go
-intColl := NewIntCollection([]int{1, 2, 2, 3})
-intColl.Filter(func(obj interface{}, index int) bool {
-    val := obj.(int)
-    if val == 2 {
-        return true
-    }
-    return false
-}).DD()
+c := collection.NewSliceCollect([]int{1, 2, 2, 3})
+res := c.Filter(func(item int, _ int) bool { return item == 2 })
+res.DD()
 
 /*
-IntCollection(2):{
+Collection(2, int):{
 	0:	2
 	1:	2
 }

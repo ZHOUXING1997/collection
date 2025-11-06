@@ -1,22 +1,18 @@
 # Sum
 
-`Sum() IMix`
+适用集合：slice_collcection
 
-返回Collection中的元素的和
+`Sum() (float64, error)`
+
+返回集合元素的和（整型、浮点型），以 `float64` 表示。
 
 ```go
-intColl := NewIntCollection([]int{1, 2, 2, 3})
-intColl.Sum().DD()
-sum, err := intColl.Sum().ToInt()
+c := collection.NewSliceCollect([]int{1, 2, 2, 3})
+sum, err := c.Sum()
 if err != nil {
-    t.Fatal(err)
+    panic(err)
 }
-
 if sum != 8 {
-    t.Fatal("sum 错误")
+    panic("sum 错误")
 }
-
-/*
-IMix(int): 8 
-*/
 ```

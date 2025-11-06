@@ -1,11 +1,7 @@
-// Package collection 提供了一组用于操作和处理各种数据类型集合的工具函数和结构。
+// Package slice_collcection 提供针对泛型切片的链式集合操作。
 //
-// collection 包的目标是替代 Go 原生的切片操作，使集合操作更符合业务开发语义，
-// 提高开发效率。该包支持多种数据类型，包括基本类型（如 int, string, float）
-// 和结构体类型，并提供了丰富的方法来操作和转换这些数据。
-//
-// 主要功能包括：过滤、映射、排序、查找、聚合、分组等操作，使开发人员能够
-// 以更直观、更语义化的方式处理数据集合。
+// 提供过滤、映射、排序、查找、聚合、分组、分页、序列化等常见操作，
+// 旨在在不追求极致性能的业务场景下提升开发效率。
 package slice_collcection
 
 import (
@@ -292,7 +288,7 @@ func (c *Collection[T]) Each(f func(item T, key int) bool) {
 	}
 }
 
-// ForEach 遍历，能保证每一个元素都被遍历到，内部决定是否跳过
+// Foreach 遍历，能保证每一个元素都被遍历到，内部决定是否跳过
 func (c *Collection[T]) Foreach(f func(item T, key int)) {
 	for i, v := range c.value {
 		f(v, i)

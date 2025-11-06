@@ -1,15 +1,23 @@
 # Contains
 
-`Contains(obj interface{}) bool`
+适用集合：slice_collcection
 
-判断一个元素是否在Collection中，必须设置compare函数
+`Contains(obj T) (bool, error)`
+
+判断元素是否在集合中；需先设置比较函数。
 
 ```go
-intColl := NewIntCollection([]int{1, 2, 2, 3})
-if intColl.Contains(1) != true {
-    t.Fatal("contain 错误1")
-}
-if intColl.Contains(5) != false {
-    t.Fatal("contain 错误2")
-}
+c := collection.NewSliceCollect([]int{1, 2, 2, 3})
+c.SetCompare(func(a, b any) int {
+    ai, bi := a.(int), b.(int)
+    switch {
+    case ai < bi: return -1
+    case ai > bi: return 1
+    default: return 0
+    }
+})
+
+ok, _ := c.Contains(1)   // true
+ok2, _ := c.Contains(5)  // false
+_ = ok; _ = ok2
 ```

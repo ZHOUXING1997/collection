@@ -1,16 +1,18 @@
 # Avg
 
-`Avg() IMix`
+适用集合：slice_collcection
 
-返回Collection的数值平均数，这里会进行类型降级，int,int64,float64的数值平均数都是返回float64类型。
+`Avg() (float64, error)`
+
+返回集合的数值平均数，支持整型与浮点型元素，返回 `float64`。
 
 ```go
-intColl := NewIntCollection([]int{1, 2, 2, 3})
-mode, err := intColl.Avg().ToFloat64()
+c := collection.NewSliceCollect([]int{1, 2, 2, 3})
+avg, err := c.Avg()
 if err != nil {
-    t.Fatal(err.Error())
+    panic(err)
 }
-if mode != 2.0 {
-    t.Fatal("Avg error")
+if avg != 2.0 {
+    panic("Avg error")
 }
 ```
