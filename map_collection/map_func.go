@@ -208,3 +208,29 @@ func Pluck[M ~map[K]V, K comparable, V any, R any](m M, fieldName string) []R {
 
 	return result
 }
+
+// extractField 从值中提取指定字段
+func extractField(v any, fieldName string) any {
+	val := reflect.ValueOf(v)
+
+	// 处理指针类型
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return nil
+		}
+		val = val.Elem()
+	}
+
+	// 确保是结构体
+	if val.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// 获取字段值
+	field := val.FieldByName(fieldName)
+	if !field.IsValid() {
+		return nil
+	}
+
+	return field.Interface()
+}

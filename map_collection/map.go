@@ -4,34 +4,28 @@ import (
 	"reflect"
 )
 
-// extractField 从值中提取指定字段
-func extractField(v any, fieldName string) any {
-	val := reflect.ValueOf(v)
+// CollectionOption 是用于配置 Collection 的函数式选项
+type CollectionOption[K comparable, V any] func(*Collection[K, V])
 
-	// 处理指针类型
-	if val.Kind() == reflect.Ptr {
-		if val.IsNil() {
-			return nil
-		}
-		val = val.Elem()
+// WithKeyCompare 设置 key 的比较函数（用于排序）
+// compareFunc: 比较函数，返回 -1(小于)、0(等于)、1(大于)
+func WithKeyCompare[K comparable, V any](compareFunc func(K, K) int) CollectionOption[K, V] {
+	return func(c *Collection[K, V]) {
+		c.keyCompareFunc = compareFunc
 	}
-
-	// 确保是结构体
-	if val.Kind() != reflect.Struct {
-		return nil
-	}
-
-	// 获取字段值
-	field := val.FieldByName(fieldName)
-	if !field.IsValid() {
-		return nil
-	}
-
-	return field.Interface()
 }
 
-// NewCollection 创建并返回一个新的 Collection 实例（默认初始化时排序）。
-func NewCollection[T ~map[K]V, K comparable, V any](values T) *Collection[K, V] {
+// WithValCompare 设置 value 的比较函数（用于按值排序）
+// compareFunc: 比较函数，返回 -1(小于)、0(等于)、1(大于)
+func WithValCompare[K comparable, V any](compareFunc func(V, V) int) CollectionOption[K, V] {
+	return func(c *Collection[K, V]) {
+		c.valCompareFunc = compareFunc
+	}
+}
+
+// NewCollection 创建并返回一个新的 Collection 实例
+// 支持函数式选项模式配置比较函数
+func NewCollection[T ~map[K]V, K comparable, V any](values T, opts ...CollectionOption[K, V]) *Collection[K, V] {
 	var vzero V
 	vType := reflect.TypeOf(vzero)
 	var kZero K
@@ -44,6 +38,11 @@ func NewCollection[T ~map[K]V, K comparable, V any](values T) *Collection[K, V] 
 		valCompareFunc: nil,
 		keyCompareFunc: nil,
 		sortedKeys:     Keys(values),
+	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(coll)
 	}
 
 	return coll
