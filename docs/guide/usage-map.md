@@ -37,3 +37,4 @@ jsonStr, _ := mc.ToJSON()
 更多 API 说明见 pkg 文档：
 - [`github.com/ZHOUXING1997/collection/map_collection`](https://pkg.go.dev/github.com/ZHOUXING1997/collection/map_collection)
 
+

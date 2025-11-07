@@ -7,4 +7,3 @@
 Map 集合（包：`map_collection`）的使用说明请参考：
 - `docs/guide/usage-map.md`
 - pkg 文档：`github.com/ZHOUXING1997/collection/map_collection`
-

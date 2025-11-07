@@ -241,13 +241,14 @@ func (c *Collection[K, V]) Foreach(fn func(value V, key K)) *Collection[K, V] {
 	return c
 }
 
-// Map 对 value 进行映射转换，返回新的 Collection
-// 注意：此方法会改变 value 的类型，因此返回的是 map[K]R 而不是 Collection
-func (c *Collection[K, V]) Map(fn func(value V, key K) V) *Collection[K, V] {
-	newMap := MapValues(c.value, fn)
-
-	return NewCollection(newMap)
-}
+// TODO 后续看看怎么，现在没办法返回新的 Collection
+// // Map 对 value 进行映射转换，返回新的 Collection
+// // 注意：此方法会改变 value 的类型，因此返回的是 map[K]R 而不是 Collection
+// func (c *Collection[K, V]) Map(fn func(value V, key K) V) *Collection[K, V] {
+// 	newMap := MapValues(c.value, fn)
+//
+// 	return NewCollection(newMap)
+// }
 
 // Reduce 聚合：将 map 折叠为一个结果
 func (c *Collection[K, V]) Reduce(init any, fn func(acc any, value V, key K) any) any {
